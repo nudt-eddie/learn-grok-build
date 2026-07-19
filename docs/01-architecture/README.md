@@ -668,4 +668,4 @@ WorkspaceHandle::drop_session(id)        // 销毁会话
 ---
 
 *文档版本: 1.0.0*  
-*生成时间: 2026-07-19*
+*来源: Grok Build 源码分析*

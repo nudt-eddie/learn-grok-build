@@ -664,4 +664,4 @@ WorkspaceHandle::drop_session(id)        // Destroy session
 ---
 
 *Document Version: 1.0.0*  
-*Generated: 2026-07-19*
+*来源: Grok Build 源码分析*
