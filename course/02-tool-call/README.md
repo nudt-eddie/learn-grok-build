@@ -1,121 +1,233 @@
-# Lesson 02: Tool Call
+# Tool Call System / 工具调用系统
 
-## Overview
+## Overview / 概述
 
-Tool calling allows AI assistants to interact with external systems, execute code, read/write files, search the web, and perform various actions beyond text generation.
+The tool call system is the core mechanism enabling the AI to interact with the external world. It provides a unified `Tool` trait for all tool implementations and a `ToolDispatch` interface for runtime routing.
 
-## Key Concepts
+工具调用系统是 AI 与外部世界交互的核心机制。它提供了统一的 `Tool` trait 用于所有工具实现，以及 `ToolDispatch` 接口用于运行时路由。
 
-### Available Tools
+---
 
-| Tool | Purpose |
-|------|---------|
-| Read | Read files from the filesystem |
-| Write | Create or overwrite files |
-| Edit | Modify specific parts of a file |
-| Bash | Execute shell commands |
-| Grep | Search file contents using regex |
-| Glob | Find files matching a pattern |
-| WebFetch | Fetch and analyze web pages |
-| WebSearch | Search the web for information |
+## Core Traits / 核心 Trait
 
-### Tool Call Pattern
+### `Tool` Trait
 
-1. **Identify the need** - Determine when external action is required
-2. **Select the tool** - Choose the appropriate tool for the task
-3. **Provide parameters** - Pass required and optional arguments
-4. **Execute and validate** - Verify the tool completed successfully
-5. **Use results** - Incorporate tool output into the response
+The central trait for all tool implementations:
 
-## Implementation Examples
+所有工具实现的核心 trait：
 
-### Reading Files
+```rust
+pub trait Tool: Send + Sync {
+    type Args: for<'de> Deserialize<'de> + JsonSchema + Send + 'static;
+    type Output: Serialize + ToolOutput + Send + 'static;
 
-```javascript
-// Read a single file
-Read({ file_path: "/path/to/file.txt" })
+    fn id(&self) -> ToolId;
+    fn description(&self, _ctx: &ListToolsContext) -> ToolDescription;
+    fn capabilities(&self) -> ToolCapabilities;
+    fn has_dynamic_description(&self) -> bool;
+    fn should_list(&self, _ctx: &ListToolsContext) -> bool;
 
-// Read with line limits
-Read({ 
-  file_path: "/path/to/file.txt",
-  limit: 100,
-  offset: 0
-})
+    fn execute(&self, ctx: ToolCallContext, args: Self::Args) -> impl Future<Output = ToolStream<Self::Output>> + Send;
+    fn run(&self, ctx: ToolCallContext, args: Self::Args) -> impl Future<Output = Result<Self::Output, ToolError>> + Send;
+}
 ```
 
-### Writing Files
+**Two execution paths / 两种执行路径：**
 
-```javascript
-// Create or overwrite a file
-Write({
-  content: "File contents here",
-  file_path: "/path/to/output.txt"
-})
+- `execute()` - Streaming entry point. Returns `ToolStream<T>` with zero or more `Progress` items followed by exactly one `Terminal`.
+- `run()` - Blocking convenience. Override this for simple tools; `execute()` wraps it automatically.
+
+- `execute()` - 流式入口。返回 `ToolStream<T>`，包含零个或多个 `Progress` 项，最后是唯一的 `Terminal`。
+- `run()` - 阻塞式便捷入口。简单工具重写此方法；`execute()` 会自动包装它。
+
+---
+
+### `ToolDispatch` Trait
+
+Object-safe dispatch interface:
+
+面向对象的调度接口：
+
+```rust
+#[async_trait]
+pub trait ToolDispatch: Send + Sync {
+    async fn call(&self, tool_id: ToolId, args: Value, ctx: ToolCallContext) -> ToolStream<TypedToolOutput>;
+    async fn call_terminal(&self, tool_id: ToolId, args: Value, ctx: ToolCallContext) -> Result<TypedToolOutput, ToolError>;
+}
 ```
 
-### Editing Files
+- `call()` - Streaming dispatch, preserves progress chunks
+- `call_terminal()` - Convenience that drains the stream and returns only the final result
 
-```javascript
-// Replace specific text in a file
-Edit({
-  file_path: "/path/to/file.txt",
-  old_string: "old text to replace",
-  new_string: "new text"
-})
+- `call()` - 流式调度，保留进度块
+- `call_terminal()` - 便捷方法，排空流并只返回最终结果
+
+---
+
+## Stream Model / 流模型
+
+```rust
+pub type ToolStream<T> = Pin<Box<dyn Stream<Item = ToolStreamItem<T>> + Send>>;
+
+pub enum ToolStreamItem<T> {
+    Progress(ToolProgress),        // Zero or more
+    Terminal(Result<T, ToolError>), // Exactly one, always last
+}
 ```
 
-### Running Commands
+**`ToolProgress` variants / 变体：**
 
-```javascript
-// Execute shell commands
-Bash({
-  command: "ls -la",
-  description: "List directory contents"
-})
+```rust
+pub enum ToolProgress {
+    Text { text: String },
+    Content { blocks: Vec<ContentBlock> },
+    Custom { subkind: String, payload: Value },
+}
 ```
 
-### Searching
+**Helper functions / 辅助函数：**
 
-```javascript
-// Search file contents
-Grep({
-  output_mode: "content",
-  path: "/path/to/search",
-  pattern: "search term"
-})
+```rust
+// Simple terminal-only result
+terminal_only(result: Result<T, ToolError>) -> ToolStream<T>
 
-// Find files by pattern
-Glob({
-  path: "/path",
-  pattern: "**/*.js"
-})
+// Stream with progress items
+with_progress(progress: P, terminal: F) -> ToolStream<T>
 ```
 
-## Best Practices
+---
 
-1. **Use absolute paths** - Always use absolute paths for file operations
-2. **Validate before edit** - Read files before attempting edits
-3. **Error handling** - Handle missing files and permission errors
-4. **Batch operations** - Combine multiple reads when possible
-5. **Timeout management** - Set appropriate timeouts for long operations
+## Content Blocks / 内容块
 
-## Common Pitfalls
+Rich content output via `ContentBlock`:
 
-- Forgetting to read a file before editing it
-- Using relative paths instead of absolute paths
-- Not handling file-not-found errors
-- Overwriting files without confirmation
-- Missing parameters in tool calls
+通过 `ContentBlock` 输出富内容：
 
-## Exercise
+```rust
+pub enum ContentBlock {
+    Text { text: String },
+    Image { mime_type: String, data: String, media_id: Option<String>, ... },
+    Resource { uri: String, mime_type: Option<String>, text: Option<String> },
+}
+```
 
-Create a simple project structure:
-1. Use `Write` to create a config.json file
-2. Use `Read` to verify the file was created
-3. Use `Edit` to modify specific values
-4. Use `Bash` to list the created files
+---
 
-## Next Steps
+## Tool Taxonomy / 工具分类
 
-- Lesson 03: Multi-step workflows
-- Lesson 04: Error handling and recovery
+### `ToolNamespace` - Toolset classification
+
+```rust
+pub enum ToolNamespace {
+    GrokBuild,
+    GrokBuildConcise,
+    GrokBuildHashline,
+    Codex,
+    OpenCode,
+    MCP,
+}
+```
+
+### `ToolKind` - Functional categorization
+
+```rust
+pub enum ToolKind {
+    Read, Edit, Delete, ListDir, Write, Move, Search,
+    Lsp, Execute, Plan, WebSearch, WebFetch,
+    BackgroundTaskAction, WaitTasksAction, KillTaskAction,
+    List, Skill, MemorySearch, MemoryGet, Task,
+    EnterPlan, ExitPlan, AskUser,
+    ImageGen, VideoGen, ImageToVideo, ReferenceToVideo,
+    DeployApp, SearchTool, UseTool, Monitor, GoalUpdate,
+    Other,
+}
+```
+
+---
+
+## Reminder System / 提醒系统
+
+Post-execution reminders fire after tool completion:
+
+工具执行完成后的提醒机制：
+
+```rust
+#[async_trait]
+pub trait Reminder {
+    fn requires_expr(&self) -> Expr<ToolRequirement>;
+    async fn collect_reminders(&self, _resources: SharedResources, _tool_output: &ToolOutput) -> Vec<String>;
+}
+```
+
+- **Per-tool reminders** - Defined on tool structs
+- **Cross-cutting reminders** - Standalone structs reacting to any tool call
+
+- **工具级提醒** - 在工具结构体上定义
+- **跨切面提醒** - 独立结构体，响应任何工具调用
+
+---
+
+## Tool Families / 工具家族
+
+Tools that share one `ToolId` but route to different implementations:
+
+共享一个 `ToolId` 但路由到不同实现的工具：
+
+```rust
+pub trait ToolFamily: Send + Sync {
+    fn id(&self) -> ToolId;
+    fn get_tool(&self, variant: &ToolVariant) -> Option<ArcTool>;
+    fn variants(&self) -> Vec<ToolVariant>;
+    fn default_variant_name(&self) -> Option<&'static str>;
+}
+
+pub enum ToolVariant {
+    Default,
+    Variant(String),
+}
+```
+
+---
+
+## RPC Protocol / RPC 协议
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolRequest {
+    Call(ToolCallArgs),
+    Definitions,
+}
+
+pub struct ToolCallArgs {
+    pub session: SessionId,
+    pub tool_name: String,
+    pub input_json: String,
+    pub call_id: ToolCallId,
+}
+```
+
+---
+
+## Key Files / 关键文件
+
+- `xai-tool-runtime/src/tool.rs` - Core `Tool` trait and stream types
+- `xai-tool-runtime/src/dispatch.rs` - `ToolDispatch` interface
+- `xai-grok-tools/src/types/tool.rs` - `ToolNamespace`, `ToolKind`, `Reminder`
+- `xai-grok-workspace-types/src/requests/tool.rs` - RPC protocol types
+
+---
+
+## Implementation Flow / 实现流程
+
+```
+ToolCallArgs (RPC)
+    ↓
+ToolDispatch::call()
+    ↓
+Tool::execute() → ToolStream<T>
+    ↓
+ToolStreamItem::Terminal(TypedToolOutput)
+    ↓
+TypedToolOutput { tool_id, value, model_output, chat_completion_output }
+```
