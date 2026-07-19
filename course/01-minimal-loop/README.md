@@ -193,6 +193,43 @@ Training complete!
 - Gradient descent optimization
 - Mini-batch vs stochastic training
 
+## How a Prompt Gets Built: From User Input to ConversationRequest
+
+When a user sends a message, the system assembles a `ConversationRequest` through several stages before sending it to the model. This process is handled by `request_builder.rs` in the `xai-chat-state` crate.
+
+### The Pipeline
+
+1. **User Input Received**: The user submits a message (text, images, or both) which becomes a `ConversationItem::User` entry in the conversation history.
+
+2. **Integrity Check**: Before building the request, `ensure_conversation_integrity()` is called to repair any dangling tool calls or duplicate results.
+
+3. **Context Budget Evaluation**: The system measures total token usage against the context window:
+   - If tokens exceed 50% of the context window, pruning is triggered
+   - Image payload size is measured precisely (without scanning base64) against a 50 MB ceiling
+
+4. **Mutation Passes** (when needed):
+   - **Image Compaction**: If the request body approaches 50 MB, the oldest inline images are replaced with a placeholder text explaining the image was removed
+   - **Tool Result Pruning**: Old, large tool results are either hard-cleared (replaced with placeholder) or soft-trimmed (head and tail kept with separator)
+   - **Memory Reminder Injection**: A persistent memory reminder is injected into the system message
+
+5. **Request Assembly**: The final `ConversationRequest` is built with:
+   - `items`: The conversation history (possibly mutated)
+   - `tools`: Tool definitions provided at initialization
+   - `model`, `temperature`, `max_output_tokens`, `top_p`: Sampling configuration
+   - `x_grok_conv_id`, `x_grok_req_id`: Correlation IDs for tracing
+
+### Key Optimization: Hot Path
+
+If no pruning, memory reminder, or image compaction is needed, the system clones the conversation directly into the request without intermediate mutation passes — avoiding unnecessary allocations and KV-cache prefix rewrites.
+
+### Reference Implementation
+
+See `source/crates/codegen/xai-chat-state/src/actor/request_builder.rs` for the complete implementation including:
+- `build_conversation_request()`: Main entry point
+- `prune_conversation()`: Old tool result cleanup
+- `compact_images_to_byte_budget()`: Image eviction logic
+- `inject_memory_reminder()`: System message augmentation
+
 ## Next Steps
 
 After completing this lesson, proceed to [Lesson 02: GPU Acceleration](../02-gpu-acceleration/README.md) to add CUDA support.

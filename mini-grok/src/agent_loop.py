@@ -13,12 +13,15 @@ References:
 
 import asyncio
 import logging
+import os
+import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -559,3 +562,335 @@ def create_message(
         command=command,
         payload=payload or {}
     )
+
+
+# ============================================================================
+# PromptContext Builder, Template Rendering, and AGENTS.md Support
+# ============================================================================
+
+@dataclass
+class PromptContext:
+    """Context for building prompts with template rendering support.
+
+    Attributes:
+        system_prompt: The base system prompt content
+        user_message: The user's input message
+        conversation_history: List of prior messages
+        agent_config: Configuration loaded from AGENTS.md
+        metadata: Additional metadata for template rendering
+        custom_variables: User-defined template variables
+    """
+    system_prompt: str = ""
+    user_message: str = ""
+    conversation_history: List[Dict[str, Any]] = field(default_factory=list)
+    agent_config: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    custom_variables: Dict[str, str] = field(default_factory=dict)
+
+    class Builder:
+        """Builder for PromptContext with fluent API."""
+
+        def __init__(self):
+            self._system_prompt = ""
+            self._user_message = ""
+            self._conversation_history: List[Dict[str, Any]] = []
+            self._agent_config: Dict[str, Any] = {}
+            self._metadata: Dict[str, Any] = {}
+            self._custom_variables: Dict[str, str] = {}
+
+        def with_system_prompt(self, prompt: str) -> "PromptContext.Builder":
+            """Set the system prompt."""
+            self._system_prompt = prompt
+            return self
+
+        def with_user_message(self, message: str) -> "PromptContext.Builder":
+            """Set the user message."""
+            self._user_message = message
+            return self
+
+        def with_conversation_history(
+            self, history: List[Dict[str, Any]]
+        ) -> "PromptContext.Builder":
+            """Set conversation history."""
+            self._conversation_history = history
+            return self
+
+        def with_agent_config(self, config: Dict[str, Any]) -> "PromptContext.Builder":
+            """Set agent configuration from AGENTS.md."""
+            self._agent_config = config
+            return self
+
+        def with_metadata(self, metadata: Dict[str, Any]) -> "PromptContext.Builder":
+            """Set metadata."""
+            self._metadata = metadata
+            return self
+
+        def with_variable(self, key: str, value: str) -> "PromptContext.Builder":
+            """Add a custom template variable."""
+            self._custom_variables[key] = value
+            return self
+
+        def with_agents_md(self, path: str | Path) -> "PromptContext.Builder":
+            """Load agent configuration from AGENTS.md file."""
+            agents_md = AgentsMdLoader.load(path)
+            self._agent_config.update(agents_md)
+            return self
+
+        def build(self) -> "PromptContext":
+            """Build the PromptContext instance."""
+            return PromptContext(
+                system_prompt=self._system_prompt,
+                user_message=self._user_message,
+                conversation_history=self._conversation_history,
+                agent_config=self._agent_config,
+                metadata=self._metadata,
+                custom_variables=self._custom_variables,
+            )
+
+    @classmethod
+    def builder(cls) -> Builder:
+        """Create a new PromptContext builder."""
+        return cls.Builder()
+
+
+def render_template(
+    template: str,
+    context: PromptContext | Dict[str, Any],
+) -> str:
+    """Render a template string with context variables.
+
+    Supports {{variable}} and {{nested.variable}} syntax.
+    Accesses all PromptContext fields plus custom_variables.
+
+    Args:
+        template: Template string with {{variable}} placeholders
+        context: PromptContext instance or dict with variables
+
+    Returns:
+        Rendered string with placeholders replaced
+    """
+    if isinstance(context, PromptContext):
+        context_dict = {
+            "system_prompt": context.system_prompt,
+            "user_message": context.user_message,
+            "conversation_history": context.conversation_history,
+            "agent_config": context.agent_config,
+            "metadata": context.metadata,
+            **context.custom_variables,
+        }
+    else:
+        context_dict = context
+
+    def replacer(match: re.Match) -> str:
+        key = match.group(1).strip()
+        # Support dot notation for nested access
+        keys = key.split(".")
+        value: Any = context_dict
+        try:
+            for k in keys:
+                value = value[k]
+            return str(value)
+        except (KeyError, TypeError):
+            return match.group(0)  # Return placeholder if not found
+
+    return re.sub(r"\{\{([^}]+)\}\}", replacer, template)
+
+
+class AgentsMdLoader:
+    """Loader for AGENTS.md configuration files.
+
+    Parses AGENTS.md files following the Anthropic/Claude convention
+    for agent instructions and configuration.
+    """
+
+    SECTION_PATTERN = re.compile(r"^#\s+(.+)$", re.MULTILINE)
+    KEY_VALUE_PATTERN = re.compile(r"^\s*([^:=\s]+)\s*[:=]\s*(.+)$", re.MULTILINE)
+    LIST_ITEM_PATTERN = re.compile(r"^\s*[-*]\s+(.+)$", re.MULTILINE)
+
+    @classmethod
+    def load(cls, path: str | Path) -> Dict[str, Any]:
+        """Load and parse an AGENTS.md file.
+
+        Args:
+            path: Path to the AGENTS.md file
+
+        Returns:
+            Dict with parsed configuration containing:
+            - instructions: Main agent instructions
+            - tools: List of available tools
+            - guidelines: Agent guidelines
+            - metadata: File-level metadata
+        """
+        path = Path(path)
+        if not path.exists():
+            logger.warning(f"AGENTS.md not found at {path}")
+            return {}
+
+        try:
+            content = path.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Failed to read AGENTS.md: {e}")
+            return {}
+
+        return cls.parse(content, {"source_file": str(path)})
+
+    @classmethod
+    def parse(cls, content: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Parse AGENTS.md content into structured configuration.
+
+        Args:
+            content: AGENTS.md file content
+            metadata: Optional metadata to include in result
+
+        Returns:
+            Parsed configuration dictionary
+        """
+        result: Dict[str, Any] = {
+            "instructions": "",
+            "tools": [],
+            "guidelines": [],
+            "capabilities": [],
+            "metadata": metadata or {},
+        }
+
+        lines = content.split("\n")
+        current_section = "preamble"
+        section_content: List[str] = []
+
+        def _flush_section():
+            nonlocal current_section, section_content
+            if not section_content:
+                return
+            text = "\n".join(section_content).strip()
+            if current_section == "preamble":
+                result["instructions"] = text
+            elif current_section == "tools":
+                result["tools"] = cls._parse_list_items(text)
+            elif current_section == "guidelines":
+                result["guidelines"] = cls._parse_list_items(text)
+            elif current_section == "capabilities":
+                result["capabilities"] = cls._parse_list_items(text)
+            else:
+                result[current_section] = text
+            section_content = []
+
+        for line in lines:
+            section_match = cls.SECTION_PATTERN.match(line)
+            if section_match:
+                _flush_section()
+                section_name = section_match.group(1).lower().strip()
+                current_section = section_name.replace(" ", "_")
+                continue
+            section_content.append(line)
+
+        _flush_section()
+
+        # Parse key-value pairs from preamble if present
+        kv_section = result.get("instructions", "")
+        parsed_kv, remaining_text = cls._parse_key_values(kv_section)
+        result.update(parsed_kv)
+        result["instructions"] = remaining_text
+
+        return result
+
+    @classmethod
+    def _parse_list_items(cls, text: str) -> List[str]:
+        """Parse list items from text."""
+        items = []
+        for match in cls.LIST_ITEM_PATTERN.finditer(text):
+            items.append(match.group(1).strip())
+        return items
+
+    @classmethod
+    def _parse_key_values(cls, text: str) -> tuple[Dict[str, Any], str]:
+        """Separate key-value pairs from prose text."""
+        lines = text.split("\n")
+        kv_pairs: Dict[str, Any] = {}
+        prose_lines: List[str] = []
+        in_list = False
+
+        for line in lines:
+            kv_match = cls.KEY_VALUE_PATTERN.match(line)
+            if kv_match:
+                key = kv_match.group(1).strip()
+                value = kv_match.group(2).strip()
+                # Check if value is a list
+                if value.startswith("[") and value.endswith("]"):
+                    value = [v.strip() for v in value[1:-1].split(",")]
+                kv_pairs[key] = value
+                in_list = False
+            elif line.strip().startswith(("-", "*")):
+                in_list = True
+                prose_lines.append(line)
+            else:
+                if line.strip():
+                    in_list = False
+                prose_lines.append(line)
+
+        return kv_pairs, "\n".join(prose_lines).strip()
+
+    @classmethod
+    def build_system_prompt(cls, config: Dict[str, Any]) -> str:
+        """Build a formatted system prompt from AGENTS.md configuration.
+
+        Args:
+            config: Configuration dict from load() or parse()
+
+        Returns:
+            Formatted system prompt string
+        """
+        parts = []
+
+        if config.get("instructions"):
+            parts.append(config["instructions"])
+
+        if config.get("capabilities"):
+            parts.append("\n## Capabilities\n")
+            for cap in config["capabilities"]:
+                parts.append(f"- {cap}")
+
+        if config.get("tools"):
+            parts.append("\n## Available Tools\n")
+            for tool in config["tools"]:
+                parts.append(f"- {tool}")
+
+        if config.get("guidelines"):
+            parts.append("\n## Guidelines\n")
+            for guideline in config["guidelines"]:
+                parts.append(f"- {guideline}")
+
+        return "\n".join(parts).strip()
+
+
+def load_agents_md(
+    base_path: str | Path | None = None,
+) -> Dict[str, Any]:
+    """Convenience function to load AGENTS.md.
+
+    Searches for AGENTS.md in common locations:
+    - Current working directory
+    - Project root (parent of src/)
+    - Specified base_path
+
+    Args:
+        base_path: Optional explicit path to search
+
+    Returns:
+        Parsed AGENTS.md configuration or empty dict if not found
+    """
+    search_paths = []
+
+    if base_path:
+        search_paths.append(Path(base_path))
+
+    search_paths.extend([
+        Path.cwd() / "AGENTS.md",
+        Path.cwd() / ".." / "AGENTS.md",
+        Path(__file__).parent.parent.parent / "AGENTS.md",
+    ])
+
+    for path in search_paths:
+        if path.exists():
+            return AgentsMdLoader.load(path)
+
+    return {}
