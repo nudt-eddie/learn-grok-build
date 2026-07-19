@@ -1,0 +1,17 @@
+# 源码作为 submodule 管理
+source/
+
+# 临时文件
+*.tmp
+*.log
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# 构建产物
+target/
+
+# 工作流文件
+workflow-*.md
