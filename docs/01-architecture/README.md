@@ -6,6 +6,8 @@ Grok Build 是 xAI 开发的高性能 AI 代码助手基础设施，采用 Rust 
 
 ### 设计目标
 
+![Architecture](../figures/architecture.mmd)
+
 - **高性能**: 全链路 Rust 实现，避免 GC 停顿，确保低延迟工具调用
 - **安全隔离**: Workspace 运行在远程沙箱，通过 capability mode 限制权限
 - **可扩展**: 插件系统支持动态注册工具、Agent、Skills
@@ -44,6 +46,8 @@ ptyctl                  PTY 控制服务
 ---
 
 ## Crate 架构地图
+
+![Architecture](../figures/architecture.mmd)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐

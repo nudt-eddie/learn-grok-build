@@ -307,78 +307,25 @@ pub type ArcTool = Arc<dyn ToolDyn>;
 ### Tool Execution Flow
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        TOOL EXECUTION FLOW                            │
-└──────────────────────────────────────────────────────────────────────┘
-
-   ┌──────────────┐
-   │ JSON-RPC     │
-   │ tool.call    │
-   │ Request      │
-   └──────┬───────┘
+1. Hub receives tool.call request
           │
           ▼
-   ┌──────────────────────────────────────────┐
-   │ 1. REQUEST VALIDATION                     │
-   │    - Parse JSON-RPC payload               │
-   │    - Validate tool_id format              │
-   │    - Extract call_id and arguments        │
-   └──────────────────────┬───────────────────┘
-                          │
-                          ▼
-   ┌──────────────────────────────────────────┐
-   │ 2. TOOL DISPATCH                          │
-   │    ToolDispatch::call(tool_id, args, ctx) │
-   │    - Lookup tool in registry              │
-   │    - Create ToolCallContext               │
-   └──────────────────────┬───────────────────┘
-                          │
-                          ▼
-   ┌──────────────────────────────────────────┐
-   │ 3. TOOL LOOKUP & ARGS PARSING             │
-   │    - Find Arc<dyn ToolDyn> by ToolId      │
-   │    - Deserialize args to Tool::Args       │
-   │    - Check should_list predicate          │
-   └──────────────────────┬───────────────────┘
-                          │
-                          ▼
-   ┌──────────────────────────────────────────┐
-   │ 4. EXECUTION (Tool::execute)              │
-   │    - Create progress stream               │
-   │    - Execute tool logic                   │
-   │    - Return ToolStream<T>                 │
-   └──────────────────────┬───────────────────┘
-                          │
-                          ▼
-   ┌──────────────────────────────────────────┐
-   │ 5. STREAM PROCESSING                      │
-   │    [Progress*] ──────────────────────┐    │
-   │         │                            │    │
-   │         ▼                            │    │
-   │    [Terminal] ◄──────────────────────┘    │
-   │    (Result<T, ToolError>)                 │
-   │                                          │
-   │    Progress:                              │
-   │    - ToolProgress::Text                   │
-   │    - ToolProgress::Content                │
-   │    - ToolProgress::Custom                 │
-   └──────────────────────┬───────────────────┘
-                          │
-                          ▼
-   ┌──────────────────────────────────────────┐
-   │ 6. ADAPTER CONVERSION                     │
-   │    ToolDyn adapter:                       │
-   │    - Serialize output to Value            │
-   │    - Extract ContentBlock for model       │
-   │    - Wrap in TypedToolOutput              │
-   └──────────────────────┬───────────────────┘
-                          │
-                          ▼
-   ┌──────────────────────────────────────────┐
-   │ 7. RESPONSE                               │
-   │    - JSON-RPC response with result        │
-   │    - Or JSON-RPC error response           │
-   └──────────────────────────────────────────┘
+2. ToolDispatch::call(tool_id, args, ctx)
+          │
+          ▼
+3. Route to concrete tool implementation
+          │
+          ▼
+4. Tool::execute(ctx, args) → ToolStream<T>
+          │
+          ▼
+5. Stream: [Progress*, Terminal(Result<T, ToolError>)]
+          │
+          ▼
+6. ToolDyn adapter serializes and extracts ContentBlock
+          │
+          ▼
+7. TypedToolOutput returned to hub
 ```
 
 ### Tool Registration Flow
@@ -660,123 +607,33 @@ The `stream_chunk` function ensures:
 
 ## Error Handling
 
-### Error Handling Overview
-
-The tool system implements a multi-layer error handling strategy:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      ERROR HANDLING LAYERS                           │
-└─────────────────────────────────────────────────────────────────────┘
-
-   Layer 1: Tool Implementation
-   ┌─────────────────────────────────────────────────────────────────┐
-   │  return Err(ToolError::Execution { tool_id, message })          │
-   └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-   Layer 2: Runtime Stream
-   ┌─────────────────────────────────────────────────────────────────┐
-   │  ToolStreamItem::Terminal(Err(ToolError))                       │
-   └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-   Layer 3: Adapter Serialization
-   ┌─────────────────────────────────────────────────────────────────┐
-   │  serde_json::to_value(&err) → Value                             │
-   └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-   Layer 4: JSON-RPC Response
-   ┌─────────────────────────────────────────────────────────────────┐
-   │  { "error": { "code": -32603, "message": "..." } }              │
-   └─────────────────────────────────────────────────────────────────┘
-```
-
 ### ToolError
-
-The central error type for tool execution:
 
 ```rust
 pub enum ToolError {
-    /// Invalid tool arguments (e.g., wrong type, missing required field)
     InvalidArguments(String),
-
-    /// Tool capability not implemented
     NotImplemented(String),
-
-    /// Execution failure with context
-    Execution {
-        tool_id: ToolId,
-        message: String,
-        /// Optional underlying error for chained diagnostics
-        source: Option<Box<dyn std::error::Error + Send + Sync>>,
-    },
-
-    /// Tool call was cancelled by user or system
+    Execution { tool_id: ToolId, message: String },
     Cancelled,
-
-    /// Tool requires capabilities not available in current context
-    CapabilityNotAvailable(String),
-
-    /// Tool is temporarily unavailable (e.g., resource locked)
-    TemporarilyUnavailable(String),
-
-    /// Permission denied for this operation
-    PermissionDenied {
-        operation: String,
-        resource: String,
-    },
+    // ...
 }
 
 impl ToolError {
-    /// Create an invalid arguments error
     pub fn invalid_arguments(msg: impl Into<String>) -> Self;
-
-    /// Create a not implemented error
     pub fn not_implemented(msg: impl Into<String>) -> Self;
-
-    /// Create an execution error with tool context
     pub fn execution(tool_id: ToolId, msg: impl Into<String>) -> Self;
-
-    /// Wrap an underlying error with context
-    pub fn with_source(self, err: impl std::error::Error + Send + Sync + 'static) -> Self;
 }
 ```
 
-### Error Code Mapping
+### Error Codes
 
-JSON-RPC error codes mapped from ToolError variants:
-
-| ToolError Variant | ErrorCode | HTTP Status |
-|-------------------|-----------|-------------|
-| `InvalidArguments` | `-32602` (InvalidParams) | 400 |
-| `NotImplemented` | `-32601` (MethodNotFound) | 501 |
-| `CapabilityNotAvailable` | `-32602` (InvalidParams) | 400 |
-| `Execution` | `-32603` (InternalError) | 500 |
-| `Cancelled` | `-32000` (ServerError) | 499 |
-| `TemporarilyUnavailable` | `-32001` (ServerError) | 503 |
-| `PermissionDenied` | `-32002` (ServerError) | 403 |
-
-### Error Response Format
-
-JSON-RPC error response structure:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "error": {
-    "code": -32603,
-    "message": "Tool 'GrokBuild:read_file' execution failed: No such file or directory",
-    "data": {
-      "tool_id": "GrokBuild:read_file",
-      "call_id": "01HX5KM7PRQV8WN1TZ9YF3GD4E",
-      "error_type": "Execution",
-      "details": "No such file or directory",
-      "source": null
-    }
-  },
-  "id": "01HX5KM7PRQV8WN1TZ9YF3GD4E"
+```rust
+pub enum ErrorCode {
+    ParseError,
+    InvalidRequest,
+    MethodNotFound,
+    InvalidArguments,
+    InternalError,
 }
 ```
 
@@ -796,190 +653,6 @@ JSON-RPC error response structure:
           │
           ▼
 5. Hub responds with JSON-RPC error response
-```
-
-### Error Handling Patterns
-
-#### Pattern 1: Try-Convert with `?` Operator
-
-```rust
-use xai_tool_runtime::{ToolError, ToolOutput};
-
-#[derive(Serialize)]
-pub struct ReadFileOutput {
-    pub content: String,
-}
-
-impl ToolOutput for ReadFileOutput { /* ... */ }
-
-async fn read_file_impl(path: &Path) -> Result<ReadFileOutput, ToolError> {
-    // Use ? to auto-convert io::Error to ToolError
-    let content = tokio::fs::read_to_string(path)
-        .await
-        .map_err(|e| ToolError::execution(
-            self.id(),
-            format!("Failed to read file: {}", e),
-        ))?;
-
-    Ok(ReadFileOutput { content })
-}
-```
-
-#### Pattern 2: Custom Error Conversion
-
-```rust
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum MyToolError {
-    #[error("File not found: {0}")]
-    FileNotFound(String),
-
-    #[error("Permission denied: {0}")]
-    PermissionDenied(String),
-
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-}
-
-impl From<MyToolError> for ToolError {
-    fn from(err: MyToolError) -> Self {
-        match err {
-            MyToolError::FileNotFound(path) => ToolError::invalid_arguments(
-                format!("File not found: {}", path),
-            ),
-            MyToolError::PermissionDenied(op) => ToolError::PermissionDenied {
-                operation: op,
-                resource: "filesystem".to_string(),
-            },
-            MyToolError::IoError(e) => ToolError::execution(
-                ToolId::new("MyTool").unwrap(),
-                e.to_string(),
-            ),
-        }
-    }
-}
-```
-
-#### Pattern 3: Validation Errors
-
-```rust
-fn validate_args(args: &ReadFileArgs) -> Result<(), ToolError> {
-    if args.path.is_empty() {
-        return Err(ToolError::invalid_arguments("path cannot be empty"));
-    }
-
-    if args.path.contains("..") {
-        return Err(ToolError::invalid_arguments(
-            "path cannot contain '..' for security reasons",
-        ));
-    }
-
-    if let Some(offset) = args.offset {
-        if offset > 1_000_000_000 {
-            return Err(ToolError::invalid_arguments(
-                "offset too large (max 1GB)",
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-async fn run(&self, ctx: ToolCallContext, args: Self::Args) -> Result<Self::Output, ToolError> {
-    validate_args(&args)?;
-
-    // Proceed with validated arguments
-    // ...
-}
-```
-
-#### Pattern 4: Graceful Degradation with Fallback
-
-```rust
-async fn run(&self, ctx: ToolCallContext, args: Self::Args) -> Result<Self::Output, ToolError> {
-    // Try primary implementation
-    match self.try_primary_impl(&args).await {
-        Ok(output) => return Ok(output),
-        Err(e) => {
-            tracing::warn!(
-                "Primary implementation failed, trying fallback: {}",
-                e
-            );
-        }
-    }
-
-    // Fallback to secondary implementation
-    self.try_fallback_impl(&args).await
-}
-```
-
-#### Pattern 5: Contextual Error Enhancement
-
-```rust
-async fn run(&self, ctx: ToolCallContext, args: Self::Args) -> Result<Self::Output, ToolError> {
-    let operation = format!("read file '{}'", args.path);
-
-    tokio::fs::read_to_string(&args.path)
-        .await
-        .map_err(|e| {
-            ToolError::execution(self.id(), format!("{}: {}", operation, e))
-                .with_source(e)
-        })
-}
-```
-
-### Cancellation Handling
-
-Tools should check for cancellation periodically:
-
-```rust
-async fn run(&self, ctx: ToolCallContext, args: Self::Args) -> Result<Self::Output, ToolError> {
-    let mut stream = with_progress(self.progress_stream(), async {
-        // Long-running operation
-        let result = self.long_running_task().await?;
-
-        // Check for cancellation
-        if ctx.get::<CancelledFlag>().map(|f| f.is_cancelled()).unwrap_or(false) {
-            return Err(ToolError::Cancelled);
-        }
-
-        Ok(result)
-    });
-
-    // Stream handles cancellation response
-    stream
-}
-```
-
-### Error Recovery Strategies
-
-| Strategy | Use Case | Example |
-|----------|----------|---------|
-| Retry with backoff | Transient failures | Network timeouts |
-| Fallback to default | Optional features | Missing optional dependency |
-| Degrade gracefully | Partial failures | Cache miss → compute fresh |
-| Propagate with context | Fatal failures | Permission denied |
-
-```rust
-// Retry with exponential backoff
-async fn with_retry<F, T, E>(mut f: F) -> Result<T, E>
-where
-    F: FnMut() -> future::Future<Output = Result<T, E>>,
-{
-    let mut attempts = 0;
-    loop {
-        match f().await {
-            Ok(result) => return Ok(result),
-            Err(e) if attempts >= 3 => return Err(e),
-            Err(e) => {
-                attempts += 1;
-                let delay = Duration::from_millis(100 * 2u64.pow(attempts));
-                tokio::time::sleep(delay).await;
-            }
-        }
-    }
-}
 ```
 
 ---

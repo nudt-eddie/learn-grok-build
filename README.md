@@ -1,16 +1,28 @@
-# 🔬 learn-grok-build
+# :microscope: learn-grok-build
 
-> 用中文深度解读 Grok Build 的 Agent Harness 架构
+> Deep dive into Grok Build's Agent Harness architecture - Chinese/English bilingual documentation
 
 [![Commit](https://img.shields.io/badge/commit-7cfcb20-blue)](https://github.com/xai-org/grok-build)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/nudt-eddie/learn-grok-build)](https://github.com/nudt-eddie/learn-grok-build/stargazers)
 
-## 项目简介
+---
+
+<div align="center">
+
+**[简体中文](#简体中文) / [English](#english)** | [:arrow_down: Switch Language](#english)
+
+</div>
+
+---
+
+## 简体中文
+
+### 项目简介
 
 本项目对 [Grok Build](https://github.com/xai-org/grok-build) 源码进行系统性解读，通过**源码地图**、**调用链追踪**、**时序图分析**和**可复现实验**，研究一个生产级 Coding Agent 如何将模型推理、上下文组装、工具系统、工作区管理、权限控制等模块有机组合。
 
-### 核心研究问题
+#### 核心研究问题
 
 | 层次 | 研究问题 |
 |------|----------|
@@ -25,9 +37,9 @@
 
 ---
 
-## 架构概览
+### 架构概览
 
-![总体架构图](figures/01_source_architecture.png)
+![总体架构图](figures/grok解读.png)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -61,7 +73,7 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 核心模块
+#### 核心模块
 
 | 模块 | Crate | 职责 |
 |------|-------|------|
@@ -76,7 +88,7 @@
 
 ---
 
-## 技术栈
+### 技术栈
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
@@ -90,7 +102,7 @@
 
 ---
 
-## 文档目录
+### 文档目录
 
 ```
 docs/
@@ -141,9 +153,9 @@ docs/
 
 ---
 
-## 学习路径
+### 学习路径
 
-### 入门路径（推荐阅读顺序）
+#### 入门路径（推荐阅读顺序）
 
 ```
 1. 01-architecture     → 建立整体印象
@@ -167,7 +179,7 @@ docs/
 10. 10-extensions      → 扩展生态
 ```
 
-### 专题路径
+#### 专题路径
 
 | 专题 | 关联文档 |
 |------|----------|
@@ -178,7 +190,7 @@ docs/
 
 ---
 
-## 源码信息
+### 源码信息
 
 | 项目 | 值 |
 |------|---|
@@ -188,20 +200,20 @@ docs/
 | **Crate 数量** | 87+ |
 | **源码规模** | ~500K LOC |
 
-> ⚠️ 本项目为**个人学习笔记**，不代表 Grok Build 官方立场。源码更新后，旧文档可能不再反映最新实现。
+> 本项目为**个人学习笔记**，不代表 Grok Build 官方立场。源码更新后，旧文档可能不再反映最新实现。
 
 ---
 
-## 快速开始
+### 快速开始
 
-### 克隆项目
+#### 克隆项目
 
 ```bash
 git clone https://github.com/nudt-eddie/learn-grok-build.git
 cd learn-grok-build
 ```
 
-### 添加源码（Submodule）
+#### 添加源码（Submodule）
 
 ```bash
 git submodule add https://github.com/xai-org/grok-build.git source
@@ -209,7 +221,7 @@ cd source
 git checkout 7cfcb20d2b50b0d18801a6c0af2e401c0e060894
 ```
 
-### 构建验证
+#### 构建验证
 
 ```bash
 cd source
@@ -218,7 +230,7 @@ cargo build --release
 
 ---
 
-## 项目原则
+### 项目原则
 
 1. **行为优先于实现** - 关注"做什么"和"为什么"，而非逐行代码
 2. **关联固定版本** - 所有结论关联到特定 commit，便于回溯
@@ -228,7 +240,7 @@ cargo build --release
 
 ---
 
-## 贡献指南
+### 贡献指南
 
 欢迎提交 PR 完善文档！
 
@@ -247,7 +259,7 @@ git push origin docs/improve-agent-loop
 
 ---
 
-## License
+### License
 
 本项目基于学习目的创建，内容为个人对源码的理解和分析，基于 MIT 协议开源。
 
@@ -256,7 +268,267 @@ Grok Build 源码基于 Apache-2.0 许可证。
 ---
 
 <p align="center">
-  <i>Built with ❤️ for the Rust community</i><br>
+  <i>Built with for the Rust community</i><br>
+  <a href="https://github.com/nudt-eddie/learn-grok-build">GitHub</a> •
+  <a href="docs/">Documentation</a> •
+  <a href="PROGRESS.md">Progress</a>
+</p>
+
+---
+
+## English
+
+### Project Overview
+
+This project provides a systematic analysis of [Grok Build](https://github.com/xai-org/grok-build) source code, exploring how a production-grade Coding Agent organically combines modules such as model inference, context assembly, tool systems, workspace management, and permission control through **source code maps**, **call chain tracing**, **sequence diagram analysis**, and **reproducible experiments**.
+
+#### Core Research Questions
+
+| Layer | Research Question |
+|-------|-------------------|
+| **Request Entry** | How do user requests enter the Agent Loop? |
+| **Context Assembly** | How is the system prompt constructed? How is message history managed? |
+| **Model Interaction** | How are Tool Calls parsed? How are streaming responses handled? |
+| **Tool Execution** | How are tools registered, approved, executed, and results returned? |
+| **Workspace** | How do file modifications, Git operations, and Checkpoints collaborate? |
+| **State Management** | How do Session, Compaction, and Memory manage state? |
+| **Security Isolation** | How do Sandbox and permission systems limit risk boundaries? |
+| **Extension Mechanisms** | How do Skills, Plugins, Hooks, and MCP extend the Harness? |
+
+---
+
+### Architecture Overview
+
+![Architecture Diagram](figures/grok解读.png)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              Grok Build Architecture                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                         User Interface Layer                            │  │
+│  │                    TUI (ratatui) │ Headless │ ACP                       │  │
+│  └────────────────────────────────┬───────────────────────────────────────┘  │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                          Agent Harness Layer                            │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │  │
+│  │  │   Agent     │  │    Tool     │  │  Workspace  │  │   Session   │    │  │
+│  │  │   Loop      │  │   System    │  │   Manager   │  │   State     │    │  │
+│  │  │ (Actor)     │  │             │  │             │  │ (Compaction)│    │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │  │
+│  └────────────────────────────────┬───────────────────────────────────────┘  │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                          Runtime Layer                                  │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │  │
+│  │  │   Tokio     │  │   Sandbox   │  │    MCP      │  │   Memory    │    │  │
+│  │  │  (async)    │  │ (Isolated)  │  │  Protocol   │  │   (Memory)  │    │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Core Modules
+
+| Module | Crate | Responsibility |
+|--------|-------|----------------|
+| **Agent Loop** | `xai-grok-agent` | Actor-based conversation state management |
+| **Tool System** | `xai-grok-tools` | Tool registration, discovery, scheduling, execution |
+| **Workspace** | `xai-grok-workspace` | File operations, Git integration, permission control |
+| **Session State** | `xai-chat-state` | Session state, Compaction, persistence |
+| **Context Assembly** | `xai-chat-state/actor` | System prompt construction, request assembly |
+| **Sandbox** | `xai-grok-sandbox` | Process isolation, secure execution |
+| **MCP** | `xai-grok-mcp` | Model Context Protocol support |
+| **Hooks** | `xai-grok-hooks` | Agent lifecycle hook extensions |
+
+---
+
+### Tech Stack
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Rust** | edition 2024 | Core language, avoiding GC pauses |
+| **Tokio** | 1.x | Async runtime |
+| **ratatui** | 0.29 | TUI terminal rendering |
+| **gix** | 0.83 | Git repository operations |
+| **tonic/prost** | 0.14 | gRPC communication |
+| **moka** | 0.12 | High-performance caching |
+| **minijinja** | 2.9 | Template rendering |
+
+---
+
+### Documentation Structure
+
+```
+docs/
+├── 01-architecture/          # Overall architecture
+│   ├── 1.1-项目概述.md       # Design goals and tech choices
+│   ├── 1.2-技术栈.md         # Core dependencies explained
+│   ├── 1.3-Crate地图.md      # Module dependencies
+│   └── 1.4-运行模式.md       # TUI/Headless/ACP modes
+├── 02-startup/               # Startup and component assembly
+│   ├── 2.1-入口点.md         # main.rs analysis
+│   ├── 2.2-配置加载.md       # Config parsing
+│   └── 2.3-初始化顺序.md     # Component assembly sequence
+├── 03-request-flow/          # Request call chain
+│   ├── 3.1-输入入口.md       # TTY/File/Socket input
+│   ├── 3.2-Agent处理.md      # Request routing
+│   └── 3.3-响应生成.md       # Streaming response handling
+├── 04-agent-loop/            # Agent Loop
+│   ├── 4.1-Actor模型.md      # ChatStateActor
+│   ├── 4.2-生命周期.md       # Turn/Command processing
+│   └── 4.3-状态管理.md       # ConversationItem
+├── 05-context-assembly/      # Context assembly
+│   ├── 5.1-系统提示词.md     # Prompt templates
+│   ├── 5.2-工具描述.md       # Tool Schema injection
+│   └── 5.3-Token管理.md      # Context window control
+├── 06-tool-system/           # Tool system
+│   ├── 6.1-工具注册.md       # Tool Trait
+│   ├── 6.2-工具发现.md       # Discovery mechanism
+│   ├── 6.3-工具执行.md       # ToolDispatch
+│   └── 6.4-结果处理.md       # Response formatting
+├── 07-workspace/             # Workspace
+│   ├── 7.1-文件操作.md       # FS operations
+│   ├── 7.2-Git集成.md        # gix wrapper
+│   ├── 7.3-权限模型.md       # Trust/Capability
+│   └── 7.4-Checkpoint.md     # Snapshot mechanism
+├── 08-session-memory/        # Session and memory
+│   ├── 8.1-Session.md        # Session lifecycle
+│   ├── 8.2-Compaction.md     # Context compression
+│   └── 8.3-持久化.md         # Journal/SQLite
+├── 09-permissions/           # Permissions and security
+│   ├── 9.1-Sandbox.md        # Process isolation
+│   ├── 9.2-文件访问.md       # Path restrictions
+│   └── 9.3-命令执行.md       # Whitelist mechanism
+└── 10-extensions/            # Extension mechanisms
+    ├── 10.1-MCP.md           # Model Context Protocol
+    ├── 10.2-Hooks.md         # Lifecycle hooks
+    └── 10.3-Skills.md        # Skills system
+```
+
+---
+
+### Learning Path
+
+#### Beginner Path (Recommended Reading Order)
+
+```
+1. 01-architecture     → Build overall understanding
+      ↓
+2. 02-startup          → Understand startup process
+      ↓
+3. 03-request-flow     → Trace request flow
+      ↓
+4. 04-agent-loop       → Master core mechanism ⭐
+      ↓
+5. 05-context-assembly → Understand context
+      ↓
+6. 06-tool-system      → Tool execution principles
+      ↓
+7. 07-workspace        → Workspace management
+      ↓
+8. 08-session-memory   → State persistence
+      ↓
+9. 09-permissions      → Security mechanisms
+      ↓
+10. 10-extensions      → Extension ecosystem
+```
+
+#### Topic-Based Path
+
+| Topic | Related Documents |
+|-------|-------------------|
+| **Actor Concurrency Model** | 04-agent-loop, 08-session-memory |
+| **Tool System Design** | 06-tool-system, 10-extensions |
+| **Security Sandbox** | 09-permissions, 07-workspace |
+| **Context Compression** | 08-session-memory, 05-context-assembly |
+
+---
+
+### Source Code Information
+
+| Item | Value |
+|------|-------|
+| **Upstream Repository** | https://github.com/xai-org/grok-build |
+| **Current Version** | `7cfcb20d2b50b0d18801a6c0af2e401c0e060894` |
+| **Analysis Date** | 2026-07-19 |
+| **Crate Count** | 87+ |
+| **Code Scale** | ~500K LOC |
+
+> This project is a **personal study note** and does not represent the official position of Grok Build. After source code updates, old documentation may no longer reflect the latest implementation.
+
+---
+
+### Quick Start
+
+#### Clone the Project
+
+```bash
+git clone https://github.com/nudt-eddie/learn-grok-build.git
+cd learn-grok-build
+```
+
+#### Add Source Code (Submodule)
+
+```bash
+git submodule add https://github.com/xai-org/grok-build.git source
+cd source
+git checkout 7cfcb20d2b50b0d18801a6c0af2e401c0e060894
+```
+
+#### Build Verification
+
+```bash
+cd source
+cargo build --release
+```
+
+---
+
+### Project Principles
+
+1. **Behavior over Implementation** - Focus on "what" and "why", not line-by-line code
+2. **Pin to Specific Versions** - All conclusions linked to specific commits for traceability
+3. **Reproducible Verification** - Key mechanisms provide minimal verifiable experiments
+4. **Distinguish Facts from Inferences** - Clearly mark source code facts vs personal inferences
+5. **Security Sanitization** - No keys, authentication info, or sensitive logs included
+
+---
+
+### Contributing Guide
+
+Pull requests to improve documentation are welcome!
+
+```bash
+# 1. Fork this repository
+# 2. Create a feature branch
+git checkout -b docs/improve-agent-loop
+
+# 3. Edit documentation
+# 4. Commit (reference corresponding source code commit)
+git commit -m "docs: Add Agent Loop retry mechanism explanation"
+
+# 5. Push and create PR
+git push origin docs/improve-agent-loop
+```
+
+---
+
+### License
+
+This project was created for learning purposes, containing personal understanding and analysis of the source code, open-sourced under the MIT license.
+
+Grok Build source code is licensed under Apache-2.0.
+
+---
+
+<p align="center">
+  <i>Built with for the Rust community</i><br>
   <a href="https://github.com/nudt-eddie/learn-grok-build">GitHub</a> •
   <a href="docs/">Documentation</a> •
   <a href="PROGRESS.md">Progress</a>

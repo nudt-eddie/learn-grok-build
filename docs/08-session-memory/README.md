@@ -422,6 +422,111 @@ pub trait ChatPersistence: Send + 'static {
 - **MockChatPersistence**: 测试用的通道实现
 - **NullChatPersistence**: 无操作实现（用于基准测试）
 
+### 持久化流程图
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Persistence Flow                                  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ push_user_message / push_assistant_response / push_tool_result      │
+│    │                                                                  │
+│    ▼                                                                  │
+│ persist_message(item)                                                │
+│    │                                                                  │
+│    ├── [可选] 写入 updates.jsonl (append only)                       │
+│    └── [可选] 追加到内存缓冲区                                       │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ flush() call (debounced)                                             │
+│    │                                                                  │
+│    ▼                                                                  │
+│ Batch write to disk                                                  │
+│    ├── 序列化 conversation 数组                                      │
+│    ├── 更新 state.json 原子写入                                      │
+│    └── 确保文件系统同步 (fsync)                                       │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ truncate_to_prompt_index / replace_conversation_for_compaction      │
+│    │                                                                  │
+│    ▼                                                                  │
+│ replace_history(new_items)                                           │
+│    ├── 清除旧文件                                                    │
+│    ├── 写入新的 updates.jsonl                                        │
+│    └── 更新 state.json                                               │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 持久化文件结构
+
+典型会话目录结构：
+```
+session_dir/
+├── state.json           # Actor 快照状态 (ChatStateSnapshot)
+│                        # - conversation 完整历史
+│                        # - sampling_config
+│                        # - prompt_index
+│                        # - total_tokens
+│                        # - credentials (加密)
+│
+├── updates.jsonl        # 追加式对话项日志
+│                        # 每行一个 ConversationItem JSON
+│                        # 用于快速重放和增量恢复
+│
+└── segments/            # CompactionMode::Segments 时使用
+    ├── summary.md       # 压缩摘要
+    ├── turn_001.md      # 分段轮次详情
+    ├── turn_002.md
+    └── ...
+```
+
+### 恢复流程
+
+```
+Session Startup
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 1. Load state.json                                                   │
+│    - 解析 ChatStateSnapshot                                          │
+│    - 恢复 conversation, prompt_index, tokens 等                      │
+└─────────────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 2. [可选] Replay updates.jsonl                                       │
+│    - 按时间顺序回放每条记录                                          │
+│    - 验证数据完整性                                                  │
+│    - 处理可能的部分写入 (recovery)                                   │
+└─────────────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 3. ensure_conversation_integrity()                                   │
+│    - 检测悬空工具调用                                                │
+│    - 修复数据不一致状态                                              │
+└─────────────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 4. Actor Ready                                                       │
+│    - ChatStateActor 运行中                                          │
+│    - 接收命令并响应查询                                              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 原子性保证
+
+- `replace_history()` 使用原子文件操作
+- 写入临时文件后 rename，避免部分写入
+- 崩溃恢复通过 `updates.jsonl` 重放实现
+
 ## 设计模式
 
 ### 1. Actor 模式
@@ -496,6 +601,56 @@ pub struct Credentials {
 
 ## 压缩模式 (Compaction)
 
+### 压缩算法流程
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     Compaction Flow                                  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 1. Trigger Check: check_auto_compact_needed(threshold_percent)      │
+│    - 计算 current_tokens / max_context_tokens                       │
+│    - 返回 AutoCompactTrigger { reason, ... } 当超过阈值             │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 2. Capture Context: CompactionStateContext                          │
+│    - recent_messages: 最近消息                                       │
+│    - last_user_query: 最后用户查询                                   │
+│    - agent_edited_paths: Agent 编辑过的文件                         │
+│    - running_tasks/subagents: 后台任务状态                          │
+│    - connected_mcp_servers: MCP 服务器连接                          │
+│    - todos: Todo 列表                                               │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+         ┌─────────┐    ┌──────────┐    ┌───────────┐
+         │ Summary │    │Transcript│    │ Segments  │
+         │  Mode   │    │  Mode    │    │   Mode    │
+         └────┬────┘    └────┬─────┘    └─────┬─────┘
+              │              │                │
+              ▼              ▼                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 3. Build Summary / Transcript / Segments                            │
+│    - is_real_user_turn() 过滤真实用户轮次                          │
+│    - 工具结果按 PruningConfig 策略修剪                               │
+│    - 保留最近 N 轮完整，旧轮摘要化                                   │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ 4. Replace Conversation                                              │
+│    - replace_conversation_for_compaction(new_items)                 │
+│    - 更新 last_compaction_prompt_index                               │
+│    - persistence.replace_history(new_items)                         │
+│    - 发送 ConversationReset 事件                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ### CompactionMode
 
 定义压缩后模型如何访问历史详情：
@@ -539,6 +694,27 @@ pub struct CompactionStateContext {
     /// Todo 列表
     pub todos: Vec<TodoSummary>,
 }
+```
+
+### PruningConfig 修剪策略
+
+工具结果修剪策略影响压缩质量：
+
+```
+PruningConfig Behavior:
+                        
+Messages in Conversation
+├── Recent N turns (keep_last_n_turns)
+│   └── 工具结果完整保留
+│
+└── Older turns
+    ├── Age < hard_clear_age_turns
+    │   └── 软修剪: 保留 head + tail 字符
+    │       ├── soft_trim_threshold 以下: 完整保留
+    │       └── 超过阈值: 保留 soft_trim_head + soft_trim_tail
+    │
+    └── Age >= hard_clear_age_turns
+        └── 硬清除: 替换为占位符文本
 ```
 
 ## 计费系统 (Usage)
