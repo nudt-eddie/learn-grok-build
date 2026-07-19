@@ -19,7 +19,7 @@ The Actor pattern is a concurrency model where each Actor is an independent exec
 
 ### 2. 核心数据结构 / Core Data Structures
 
-[SOURCE] xai-chat-state/src/actor/mod.rs#L28-L43
+https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L28-L43
 
 ```rust
 pub struct ChatStateActor {
@@ -46,7 +46,7 @@ pub struct ChatStateActor {
 
 ### 3. Actor 的 Spawn 模式 / Actor Spawn Pattern
 
-[SOURCE] xai-chat-state/src/actor/mod.rs#L53-L94
+https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L53-L94
 
 ```rust
 pub fn spawn(
@@ -95,7 +95,7 @@ pub fn spawn_with_pruning(...) -> ChatStateHandle {
 
 ### 主循环：事件驱动的消息处理 / Main Loop: Event-Driven Message Processing
 
-[SOURCE] xai-chat-state/src/actor/mod.rs#L96-L114
+https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L96-L114
 
 ```rust
 /// Main actor loop — processes commands until shutdown or cancellation.
@@ -131,7 +131,7 @@ async fn run(mut self) {
 
 ### 命令分发：模式匹配 / Command Dispatch: Pattern Matching
 
-[SOURCE] xai-chat-state/src/actor/mod.rs#L116-L390
+https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L116-L390
 
 Actor 使用 Rust 的 `match` 表达式将命令分发给不同的处理函数：
 
@@ -157,7 +157,7 @@ fn handle_command(&mut self, cmd: ChatStateCommand) {
 
 ### 事件发送 / Event Sending
 
-[SOURCE] xai-chat-state/src/actor/mod.rs#L45-L51
+https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L45-L51
 
 ```rust
 fn send_event(&self, event: ChatStateEvent) {
@@ -392,9 +392,9 @@ Add cancellation token functionality to the Python implementation, mimicking the
 
 ### 练习 3: 分析 Rust 代码 / Exercise 3: Analyze Rust Code
 
-阅读 [SOURCE] xai-chat-state/src/actor/mod.rs#L243-L268 中的查询命令实现，说明为什么查询命令在读取引用时不需要锁。
+阅读 https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L243-L268 中的查询命令实现，说明为什么查询命令在读取引用时不需要锁。
 
-Read the query command implementation in [SOURCE] xai-chat-state/src/actor/mod.rs#L243-L268 and explain why query commands don't need locks when reading references.
+Read the query command implementation in https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L243-L268 and explain why query commands don't need locks when reading references.
 
 ### 练习 4: 扩展持久化 / Exercise 4: Extend Persistence
 
@@ -422,7 +422,7 @@ In the next chapter, we will dive deep into the state management mutations modul
 ---
 
 **参考来源 / References:**
-- [SOURCE] xai-chat-state/src/actor/mod.rs (L1-L392)
-- [SOURCE] xai-chat-state/src/actor/state.rs
-- [SOURCE] xai-chat-state/src/commands.rs
-- [SOURCE] xai-chat-state/src/events.rs
+- https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs (L1-L392)
+- https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/state.rs
+- https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/commands.rs
+- https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/events.rs
