@@ -249,7 +249,7 @@ git push origin docs/improve-agent-loop
 
 ## License
 
-本项目基于学习目的创建，内容为个人对源码的理解和分析。
+本项目基于学习目的创建，内容为个人对源码的理解和分析，基于 MIT 协议开源。
 
 Grok Build 源码基于 Apache-2.0 许可证。
 
