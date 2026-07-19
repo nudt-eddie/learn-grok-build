@@ -173,7 +173,8 @@ grok-build/
 
 | 模块 | Crate | 职责 |
 |------|-------|------|
-| **Agent Loop** | `xai-grok-agent` | 基于 Actor 模型的对话状态管理 |
+| **Agent Loop (Runtime)** | `xai-grok-shell` | Agent 循环运行时执行（消息路由、模型调用、响应处理） |
+| **Agent Loop (Actor)** | `xai-chat-state` | 基于 Actor 模型的对话状态管理与上下文组装 |
 | **Tool System** | `xai-grok-tools` | 工具注册、发现、调度、执行 |
 | **Workspace** | `xai-grok-workspace` | 文件操作、Git 集成、权限控制 |
 | **Session State** | `xai-chat-state` | 会话状态、Compaction、持久化 |
@@ -181,6 +182,20 @@ grok-build/
 | **Sandbox** | `xai-grok-sandbox` | 进程隔离、安全执行 |
 | **MCP** | `xai-grok-mcp` | Model Context Protocol 支持 |
 | **Hooks** | `xai-grok-hooks` | Agent 生命周期钩子扩展 |
+
+### 模块依赖层次
+
+```
+xai-grok-pager-bin     # 可执行入口
+    └── xai-grok-pager # TUI 分页渲染
+        └── xai-grok-shell           # Agent Loop 运行时 (消息循环、模型调用)
+            └── xai-grok-agent       # Agent 编排层 (工具编排、生命周期)
+                └── xai-chat-state   # Actor 状态机 (对话状态、上下文组装)
+                    └── xai-grok-tools         # 工具系统
+                        └── xai-grok-workspace # 工作区管理
+```
+
+> 注意: `xai-grok-agent` 不包含 Agent Loop 核心逻辑，仅负责工具编排与 Agent 生命周期管理。Agent Loop 的消息循环运行时在 `xai-grok-shell`，对话状态管理 (Actor) 在 `xai-chat-state`。
 
 ---
 
@@ -288,11 +303,35 @@ cd source
 git checkout 7cfcb20d2b50b0d18801a6c0af2e401c0e060894
 ```
 
-#### 构建验证
+#### 构建验证 (Build Verification)
+
+##### 环境要求 (Build Requirements)
+
+| 依赖 | 版本 | 说明 |
+|------|------|------|
+| **Rust 工具链** | nightly-2024-edition 或更新 | 项目使用 Rust edition 2024 |
+| **protoc** | 3.x+ | Protocol Buffers 编译器，gRPC 通信依赖 |
+| **DotSlash** | 最新版 | `dotnet x` 脚本用于拉取预编译工具链（部分 CI 工具依赖） |
+
+> **Windows 支持说明**: Windows 构建为最佳努力 (best-effort)，部分功能可能受限或需要额外配置。
+
+##### 构建步骤 (Build Steps)
 
 ```bash
 cd source
+
+# 区分两个版本标识:
+# - upstream git commit: 当前 submodule 检出的实际 commit
+# - SOURCE_REV: Cargo.toml 中声明的源码版本，用于版本报告
+
+# 方式一: 仅构建（验证编译通过）
 cargo build --release
+
+# 方式二: 构建并运行 TUI 应用（推荐）
+cargo run -p xai-grok-pager-bin --release
+
+# 方式三: 构建单个 crate（加速开发迭代）
+cargo build -p xai-grok-agent --release
 ```
 
 ---
@@ -498,7 +537,8 @@ grok-build/
 
 | Module | Crate | Responsibility |
 |--------|-------|----------------|
-| **Agent Loop** | `xai-grok-agent` | Actor-based conversation state management |
+| **Agent Loop (Runtime)** | `xai-grok-shell` | Agent loop runtime execution (message routing, model calls, response handling) |
+| **Agent Loop (Actor)** | `xai-chat-state` | Actor-based conversation state management and context assembly |
 | **Tool System** | `xai-grok-tools` | Tool registration, discovery, scheduling, execution |
 | **Workspace** | `xai-grok-workspace` | File operations, Git integration, permission control |
 | **Session State** | `xai-chat-state` | Session state, Compaction, persistence |
@@ -506,6 +546,20 @@ grok-build/
 | **Sandbox** | `xai-grok-sandbox` | Process isolation, secure execution |
 | **MCP** | `xai-grok-mcp` | Model Context Protocol support |
 | **Hooks** | `xai-grok-hooks` | Agent lifecycle hook extensions |
+
+### Module Dependency Hierarchy
+
+```
+xai-grok-pager-bin     # Executable entry point
+    └── xai-grok-pager # TUI pager rendering
+        └── xai-grok-shell           # Agent Loop runtime (message loop, model calls)
+            └── xai-grok-agent       # Agent orchestration layer (tool orchestration, lifecycle)
+                └── xai-chat-state   # Actor state machine (conversation state, context assembly)
+                    └── xai-grok-tools         # Tool system
+                        └── xai-grok-workspace # Workspace management
+```
+
+> Note: `xai-grok-agent` does not contain the Agent Loop core logic; it only handles tool orchestration and Agent lifecycle management. The Agent Loop's message loop runtime is in `xai-grok-shell`, and conversation state management (Actor) is in `xai-chat-state`.
 
 ---
 
@@ -615,9 +669,33 @@ git checkout 7cfcb20d2b50b0d18801a6c0af2e401c0e060894
 
 #### Build Verification
 
+##### Build Requirements
+
+| Dependency | Version | Description |
+|------------|---------|-------------|
+| **Rust Toolchain** | nightly-2024-edition or newer | Project uses Rust edition 2024 |
+| **protoc** | 3.x+ | Protocol Buffers compiler, required for gRPC |
+| **DotSlash** | latest | `dotnet x` scripts for fetching precompiled toolchains (some CI tools depend on this) |
+
+> **Windows Support Note**: Windows build is best-effort; some features may be limited or require additional configuration.
+
+##### Build Steps
+
 ```bash
 cd source
+
+# Two version identifiers to distinguish:
+# - upstream git commit: actual commit checked out in submodule
+# - SOURCE_REV: declared in Cargo.toml, used for version reporting
+
+# Option 1: Build only (verify compilation)
 cargo build --release
+
+# Option 2: Build and run TUI app (recommended)
+cargo run -p xai-grok-pager-bin --release
+
+# Option 3: Build single crate (faster for development iteration)
+cargo build -p xai-grok-agent --release
 ```
 
 ---

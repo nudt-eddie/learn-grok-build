@@ -13,7 +13,7 @@ Grok Build provides a modular extension system composed of six core subsystems. 
 5. [Memory](#5-memory)
 6. [TUI (Terminal User Interface)](#6-tui-terminal-user-interface)
 7. [Headless Mode](#7-headless-mode)
-8. [ACP (Agent Communication Protocol)](#8-acp-agent-communication-protocol)
+8. [ACP (Agent Client Protocol)](#8-acp-agent-client-protocol)
 9. [Cross-Cutting Concerns](#9-cross-cutting-concerns)
 
 ---
@@ -36,7 +36,7 @@ Grok Build
 ├── Memory      Cross-session semantic persistence with SQLite + vector search
 ├── TUI         Terminal rendering, input handling, layout engine
 ├── Headless    Background execution, session recovery, daemon protocol
-└── ACP         Inter-process agent communication and reverse channel bridge
+└── ACP         IDE/editor communication via JSON-RPC
 ```
 
 ---
@@ -576,54 +576,46 @@ The TUI is structured around a rendering loop that:
 
 ### Module Purpose
 
-Headless mode allows Grok Build to run as a background daemon without a terminal. It enables:
+Headless mode enables **single-prompt non-interactive execution** via `grok -p "<prompt>"`. It runs a complete request-response cycle without a terminal UI and then exits. It is **not a daemon** — there is no persistent background process, no session persistence, and no reconnection capability.
 
-- **Background execution**: Long-running tasks continue after terminal disconnection
-- **Session recovery**: Sessions can be detached and reattached
-- **Daemon protocol**: JSON-RPC or HTTP-based communication with the headless instance
-- **Persistent state**: Maintains in-memory state across process forks
+### Usage
 
-### Session Model
-
-In headless mode, a session is a persistent execution context. The session survives terminal disconnects and can be recovered by reconnecting to the daemon. State includes:
-
-- Conversation history and context
-- MCP client connections
-- Sandbox state
-- Memory index handles
-- Hook event handlers
-
-### Daemon Protocol
-
-The headless daemon exposes a local socket or HTTP endpoint for client connections:
-
-```
-Grok Build Client  →  Unix Socket / HTTP  →  Grok Headless Daemon
-                     (daemon protocol)
+```bash
+grok -p "Explain this code"
+grok -p --model x-ai-grok-3 "your prompt here"
 ```
 
-The protocol supports:
-- Session creation and management
-- Message streaming (stdio replacement)
-- State queries
-- Graceful shutdown
+The `-p` flag runs headless mode:
+- Executes a single prompt end-to-end
+- Outputs results to stdout
+- Exits immediately upon completion
+- No TUI, no terminal UI, no interactive loop
+
+### Headless Mode vs Agent Mode
+
+| Aspect | Headless Mode (`grok -p`) | Agent Mode (`grok agent serve`) |
+|--------|---------------------------|--------------------------------|
+| Execution | Single prompt, one-shot | Persistent daemon, long-running |
+| Interactive | No | Yes (repl-like or service) |
+| Session persistence | None | Yes (detachable/recoverable) |
+| Use case | CI/CD, scripts, one-off tasks | Interactive development, debugging |
 
 ### Key Design Points
 
-- **Process isolation**: The daemon runs as a separate process, isolated from the client's lifecycle.
-- **Signal handling**: SIGTERM initiates graceful shutdown with session persistence.
-- **Session persistence**: Sessions are serialized to disk for recovery after daemon restart.
-- **Socket activation**: The daemon can be socket-activated by systemd or launched directly.
+- **Single invocation**: The process runs one prompt and exits — no loop, no state between calls.
+- **No daemon**: Unlike `grok agent serve`, there is no background listener or persistent session.
+- **TTY optional**: stdin/stdout are used when available; the process works in pipelines and CI environments.
+- **Process lifetime**: The Grok Build process is tied to the request lifecycle.
 
 ---
 
-## 8. ACP (Agent Communication Protocol)
+## 8. ACP (Agent Client Protocol)
 
 ### Module Purpose
 
-ACP defines how Grok Build agents communicate with each other and with external MCP servers. It encompasses:
+ACP (Agent Client Protocol) defines how Grok Build communicates with IDEs and editors via JSON-RPC. It encompasses:
 
-- **Protocol constants**: Wire format, message types, and version negotiation
+- **JSON-RPC transport**: Wire format for requests, responses, and notifications
 - **Reverse channel**: Server-initiated callbacks to the client
 - **ACP-MCP bridge**: Transparent proxy between ACP and MCP protocols
 
