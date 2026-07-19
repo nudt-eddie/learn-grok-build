@@ -3,7 +3,7 @@
 > 用中文深度解读 Grok Build 的 Agent Harness 架构
 
 [![Commit](https://img.shields.io/badge/commit-7cfcb20-blue)](https://github.com/xai-org/grok-build)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/nudt-eddie/learn-grok-build)](https://github.com/nudt-eddie/learn-grok-build/stargazers)
 
 ## 项目简介
@@ -237,9 +237,7 @@ git checkout -b docs/improve-agent-loop
 
 # 3. 编辑文档
 # 4. 提交 (引用对应源码 commit)
-git commit -m "docs: 补充 Agent Loop 重试机制说明
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+git commit -m "docs: 补充 Agent Loop 重试机制说明"
 
 # 5. Push 并创建 PR
 git push origin docs/improve-agent-loop
