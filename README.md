@@ -20,7 +20,7 @@
 
 ### 项目简介
 
-本项目对 [Grok Build](https://github.com/xai-org/grok-build) 源码进行系统性解读，通过**源码地图**、**调用链追踪**、**时序图分析**和**可复现实验**，研究一个生产级 Coding Agent 如何将模型推理、上下文组装、工具系统、工作区管理、权限控制等模块有机组合。
+本项目对 [Grok Build](https://github.com/xai-org/grok-build) 源码进行系统性解读，通过**源码地图**、**调用链追踪**和**时序图分析**，研究一个生产级 Coding Agent 如何将模型推理、上下文组装、工具系统、工作区管理、权限控制等模块有机组合。
 
 #### 核心研究问题
 
@@ -301,7 +301,7 @@ cargo build --release
 
 1. **行为优先于实现** - 关注"做什么"和"为什么"，而非逐行代码
 2. **关联固定版本** - 所有结论关联到特定 commit，便于回溯
-3. **可复现验证** - 关键机制提供最小可验证实验
+3. **源码证据** - 重要结论关联到具体的源码位置和上游永久链接
 4. **区分事实与推断** - 明确标注源码事实 vs 个人推断
 5. **安全脱敏** - 不包含密钥、认证信息或敏感日志
 
@@ -345,7 +345,7 @@ Grok Build 源码基于 Apache-2.0 许可证。
 
 ### Project Overview
 
-This project provides a systematic analysis of [Grok Build](https://github.com/xai-org/grok-build) source code, exploring how a production-grade Coding Agent organically combines modules such as model inference, context assembly, tool systems, workspace management, and permission control through **source code maps**, **call chain tracing**, **sequence diagram analysis**, and **reproducible experiments**.
+This project provides a systematic analysis of [Grok Build](https://github.com/xai-org/grok-build) source code, exploring how a production-grade Coding Agent organically combines modules such as model inference, context assembly, tool systems, workspace management, and permission control through **source code maps**, **call chain tracing**, and **sequence diagram analysis**.
 
 #### Core Research Questions
 
@@ -626,7 +626,7 @@ cargo build --release
 
 1. **Behavior over Implementation** - Focus on "what" and "why", not line-by-line code
 2. **Pin to Specific Versions** - All conclusions linked to specific commits for traceability
-3. **Reproducible Verification** - Key mechanisms provide minimal verifiable experiments
+3. **Source Evidence** - Key conclusions linked to specific source code locations with upstream permalinks
 4. **Distinguish Facts from Inferences** - Clearly mark source code facts vs personal inferences
 5. **Security Sanitization** - No keys, authentication info, or sensitive logs included
 
