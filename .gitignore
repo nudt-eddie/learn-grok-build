@@ -1,6 +1,9 @@
 # 源码作为 submodule 管理
 source/
 
+# Claude Code 配置（本地私有）
+.claude/
+
 # 临时文件
 *.tmp
 *.log
