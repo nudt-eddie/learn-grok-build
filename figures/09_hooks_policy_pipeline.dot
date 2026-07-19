@@ -1,0 +1,40 @@
+digraph G {
+  graph [bgcolor="#FCFDFE", pad="0.25", nodesep="0.45", ranksep="0.65", splines=ortho, fontname="Noto Sans CJK SC", fontsize=22, labelloc=t, labeljust=l, label="09. Hooks：发现、去重、匹配、执行与 PreToolUse 策略"];
+  node [shape=box, style="rounded,filled", fontname="Noto Sans CJK SC", fontsize=13, color="#CBD5E1", penwidth=1.2, margin="0.16,0.10", fillcolor="#FFFFFF", fontcolor="#172033"];
+  edge [fontname="Noto Sans CJK SC", fontsize=11, color="#64748B", penwidth=1.35, arrowsize=0.75, fontcolor="#475569"];
+
+  subgraph cluster_sources {
+    label="发现来源（按顺序合并）"; color="#8EB8F8"; style="rounded,filled"; fillcolor="#F4F8FF";
+    gsettings [label="Global settings / hooks dir\n~/.grok / 兼容 Claude/Cursor", fillcolor="#EAF2FF"];
+    psettings [label="Project settings / hooks dir\n.grok/hooks", fillcolor="#EAF2FF"];
+    plugins [label="Plugin hooks\nhooks/hooks.json", fillcolor="#EAF2FF"];
+  }
+  subgraph cluster_discovery {
+    label="Discovery → HookRegistry 快照"; color="#A7D7C5"; style="rounded,filled"; fillcolor="#F3FBF7";
+    scan [label="扫描 *.json\n忽略隐藏/临时文件\n文件名词典序", fillcolor="#E7F7EF"];
+    parse [label="解析 HookSpec\ncommand / URL / matcher / env", fillcolor="#E7F7EF"];
+    dedupe [label="跨来源去重\n(event, command, url, matcher)\nGlobal 先到先得", fillcolor="#E7F7EF"];
+    registry [label="HookRegistry\n按 EventName 建索引\n会话级 point-in-time snapshot", fillcolor="#E7F7EF"];
+  }
+  subgraph cluster_dispatch {
+    label="事件分派与策略"; color="#C9B5F4"; style="rounded,filled"; fillcolor="#FAF7FF";
+    events [label="15 类事件\nSession / Prompt / Tool / Permission\nStop / Notification / Subagent / Compact", fillcolor="#F0EAFE"];
+    filter [label="enabled + trust/disabled\nMatcher 按工具名过滤", fillcolor="#F0EAFE"];
+    run [label="顺序执行 HookRunner\n子进程或 HTTP\ntimeout + 环境变量", fillcolor="#F0EAFE"];
+    pre [label="PreToolUse\n显式 Deny 立即短路", fillcolor="#FFE9E9", color="#F2A6A6"];
+    nonblock [label="其他事件\n非阻塞结果与 UI 注解", fillcolor="#F0EAFE"];
+  }
+  allow [label="允许工具调用", fillcolor="#E7F7EF", color="#8AC5A8"];
+  deny [label="拒绝工具调用\n返回 reason + hook_name", fillcolor="#FFE9E9", color="#F2A6A6"];
+  failopen [label="失败策略：timeout / crash / malformed output\n记录日志与 scrollback，但默认 fail-open", shape=note, fillcolor="#FFF8E8", color="#F2C66D"];
+  gsettings -> scan; psettings -> scan; plugins -> scan;
+  scan -> parse -> dedupe -> registry -> events -> filter -> run;
+  run -> pre [label="PreToolUse"];
+  run -> nonblock [label="其他事件"];
+  pre -> deny [label="Decision::Deny"];
+  pre -> allow [label="Allow / no match / failure"];
+  run -> failopen [style=dashed, arrowhead=none];
+  lifecycle [label="源码特性：磁盘修改只在新会话生效；反序列化后会重新编译 matcher。", shape=note, fillcolor="#F8FAFC", color="#CBD5E1"];
+  registry -> lifecycle [style=dashed, arrowhead=none];
+
+}

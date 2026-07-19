@@ -1,0 +1,46 @@
+flowchart LR
+    subgraph Storage["Storage Layer"]
+        Global[(Global MEMORY.md)]
+        Workspace[(Workspace MEMORY.md)]
+        Sessions[(Session Logs)]
+    end
+
+    subgraph Index["Indexing"]
+        FTS[FTS5 BM25 Index]
+        Vec[SQLite Vec KNN]
+        Meta[Metadata Index]
+    end
+
+    subgraph Search["Search Pipeline"]
+        Query[Query Input]
+        FTS_Search[BM25 Search]
+        Vec_Search[KNN Search]
+        Merge[Merge Results]
+        Rank[Rank & Score]
+    end
+
+    subgraph Output["Output"]
+        Retrieve[Retrieve Chunks]
+        MMR[MMR Deduplication]
+        Context[Context Ready]
+    end
+
+    Global --> FTS
+    Workspace --> FTS
+    Sessions --> FTS
+
+    Global --> Vec
+    Workspace --> Vec
+
+    Query --> FTS_Search
+    Query --> Vec_Search
+
+    FTS_Search --> Merge
+    Vec_Search --> Merge
+    Merge --> Rank
+    Rank --> Retrieve
+    Retrieve --> MMR
+    MMR --> Context
+
+    style FTS fill:#4ecdc4
+    style Vec fill:#95e1d3

@@ -1,0 +1,37 @@
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Pager
+    participant Agent
+    participant Hooks
+    participant Sandbox
+    participant Memory
+    participant LLM
+
+    User->>CLI: Request
+    CLI->>Pager: Route
+    Pager->>Agent: Process
+
+    Agent->>Hooks: Pre-Request
+    Hooks-->>Agent: Allowed/Denied
+
+    loop Agent Loop
+        Agent->>LLM: Send to Model
+        LLM-->>Agent: Response
+
+        alt Tool Call
+            Agent->>Sandbox: Execute Tool
+            Sandbox-->>Agent: Tool Result
+            Agent->>Hooks: Post-Tool
+        end
+
+        Agent->>Memory: Retrieve Context
+        Memory-->>Agent: Context
+    end
+
+    Agent->>LLM: Build Prompt
+    LLM-->>Agent: Compaction Result
+
+    Agent->>Memory: Update Session
+    Agent->>Pager: Render Response
+    Pager-->>User: Display

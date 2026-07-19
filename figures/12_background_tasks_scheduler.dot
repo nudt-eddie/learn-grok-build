@@ -1,0 +1,40 @@
+digraph G {
+  graph [bgcolor="#FCFDFE", pad="0.25", nodesep="0.45", ranksep="0.65", splines=ortho, fontname="Noto Sans CJK SC", fontsize=22, labelloc=t, labeljust=l, label="12. 后台任务：Command、Monitor、Scheduler 与 Subagent 统一生命周期"];
+  node [shape=box, style="rounded,filled", fontname="Noto Sans CJK SC", fontsize=13, color="#CBD5E1", penwidth=1.2, margin="0.16,0.10", fillcolor="#FFFFFF", fontcolor="#172033"];
+  edge [fontname="Noto Sans CJK SC", fontsize=11, color="#64748B", penwidth=1.35, arrowsize=0.75, fontcolor="#475569"];
+
+  user [label="Agent Turn / 用户指令", fillcolor="#EAF2FF"];
+  subgraph cluster_spawn {
+    label="任务创建入口"; color="#8EB8F8"; style="rounded,filled"; fillcolor="#F4F8FF";
+    bg [label="run_terminal_command\nbackground: true", fillcolor="#EAF2FF"];
+    monitor [label="monitor tool\n逐行事件流", fillcolor="#EAF2FF"];
+    loop [label="/loop / scheduler_create\n定时 Prompt", fillcolor="#EAF2FF"];
+    subagent [label="Background Subagent", fillcolor="#EAF2FF"];
+  }
+  subgraph cluster_runtime {
+    label="统一 Task Runtime"; color="#A7D7C5"; style="rounded,filled"; fillcolor="#F3FBF7";
+    id [label="立即返回 task_id\n前台对话继续", fillcolor="#E7F7EF"];
+    state [label="状态机\nRunning / Completed / Failed / Killed", fillcolor="#E7F7EF"];
+    output [label="输出缓冲与状态查询\nget_command_or_subagent_output", fillcolor="#E7F7EF"];
+    wait [label="wait_any / wait_all\n最多 20 个 task_id", fillcolor="#E7F7EF"];
+    kill [label="终止\nShell: SIGTERM → SIGKILL\nSubagent: Cancel → Shutdown", fillcolor="#E7F7EF"];
+  }
+  subgraph cluster_wakeup {
+    label="唤醒与可视化"; color="#C9B5F4"; style="rounded,filled"; fillcolor="#FAF7FF";
+    notify [label="完成/新行/定时器触发\nConversation Notification", fillcolor="#F0EAFE"];
+    pane [label="Tasks Pane (Ctrl+B)\ncommands / monitors / loops / subagents", fillcolor="#F0EAFE"];
+    status [label="watching 状态行\n持续统计活动任务", fillcolor="#F0EAFE"];
+    turn [label="必要时唤醒 Agent\n创建新的 turn", fillcolor="#F0EAFE"];
+  }
+  user -> bg; user -> monitor; user -> loop; user -> subagent;
+  bg -> id; monitor -> id; loop -> id; subagent -> id;
+  id -> state;
+  state -> output; state -> wait; state -> kill;
+  state -> notify [label="完成"];
+  monitor -> notify [label="每一行"];
+  loop -> notify [label="timer fire"];
+  notify -> pane; notify -> status; notify -> turn;
+  safety [label="运行约束：monitor 输出过量会自动停止；/loop 最小 60 秒、默认最长存活 7 天、最多 50 个计划任务。", shape=note, fillcolor="#FFF8E8", color="#F2C66D"];
+  monitor -> safety [style=dashed, arrowhead=none]; loop -> safety [style=dashed, arrowhead=none];
+
+}

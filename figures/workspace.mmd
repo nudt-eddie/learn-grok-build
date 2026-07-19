@@ -1,0 +1,37 @@
+flowchart TB
+    subgraph Workspace["Workspace Components"]
+        direction TB
+        Root[Root Directory]
+        Git[Git Repository]
+        Memory[Workspace MEMORY.md]
+        Temp[Temp Directory]
+    end
+
+    subgraph Session["Session Management"]
+        ID[Session ID]
+        State[Session State]
+        Logs[Session Logs]
+    end
+
+    subgraph Lifecycle["Lifecycle States"]
+        Init[Initialize]
+        Active[Active]
+        Suspended[Suspended]
+        Closed[Closed]
+    end
+
+    Init --> Active
+    Active --> Suspended
+    Suspended --> Active
+    Active --> Closed
+    Suspended --> Closed
+
+    Root --> Git
+    Root --> Memory
+    Git --> ID
+    ID --> Logs
+    Logs --> State
+
+    style Init fill:#4ecdc4
+    style Active fill:#95e1d3
+    style Closed fill:#ff6b6b

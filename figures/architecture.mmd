@@ -1,0 +1,51 @@
+flowchart TB
+    subgraph Client["Client Layer"]
+        CLI[CLI Interface]
+        Pager[Pager / TUI]
+        Agent[Agent Core]
+    end
+
+    subgraph Core["Core Components"]
+        Compaction[Compaction Engine]
+        Memory[Memory System]
+        Hooks[Hooks System]
+        Sandbox[Sandbox Engine]
+    end
+
+    subgraph Background["Background Tasks"]
+        Tasks[Task Scheduler]
+        Monitor[Background Monitor]
+        SubAgent[Subagent Manager]
+    end
+
+    subgraph Plugins["Plugin System"]
+        Skills[Skills]
+        Commands[Commands]
+        MCP[MCP Servers]
+        LSP[LSP Servers]
+    end
+
+    subgraph Storage["Storage Layer"]
+        Workspace[Workspace]
+        SessionLogs[Session Logs]
+        MemoryDB[(SQLite + FTS5)]
+    end
+
+    CLI --> Pager
+    Pager --> Agent
+    Agent --> Compaction
+    Agent --> Memory
+    Agent --> Hooks
+    Agent --> Sandbox
+
+    Agent --> Tasks
+    Tasks --> Monitor
+    Tasks --> SubAgent
+
+    Hooks --> Plugins
+
+    Memory --> Workspace
+    Memory --> SessionLogs
+    Memory --> MemoryDB
+
+    CrashHandler[Crash Handler] -.-> Agent

@@ -1,0 +1,34 @@
+digraph G {
+  graph [bgcolor="#FCFDFE", pad="0.25", nodesep="0.45", ranksep="0.65", splines=ortho, fontname="Noto Sans CJK SC", fontsize=22, labelloc=t, labeljust=l, label="11. Crash Handler：启动检测、信号安全落盘与下次启动符号化"];
+  node [shape=box, style="rounded,filled", fontname="Noto Sans CJK SC", fontsize=13, color="#CBD5E1", penwidth=1.2, margin="0.16,0.10", fillcolor="#FFFFFF", fontcolor="#172033"];
+  edge [fontname="Noto Sans CJK SC", fontsize=11, color="#64748B", penwidth=1.35, arrowsize=0.75, fontcolor="#475569"];
+
+  subgraph cluster_boot {
+    label="下一次启动：恢复与诊断"; color="#8EB8F8"; style="rounded,filled"; fillcolor="#F4F8FF";
+    check [label="check_previous_crash()\n必须先于 install", fillcolor="#EAF2FF"];
+    parse [label="读取 last-crash.bin\n解析 CrashBlob", fillcolor="#EAF2FF"];
+    sym [label="Symbolicate\n解析指令地址与 frame chain", fillcolor="#EAF2FF"];
+    report [label="写 last-crash-report.txt\n权限 0600\n归档 history/ 保留 5 份", fillcolor="#EAF2FF"];
+  }
+  subgraph cluster_install {
+    label="当前进程：尽早安装"; color="#A7D7C5"; style="rounded,filled"; fillcolor="#F3FBF7";
+    early [label="main() 早期\n异步 runtime / 线程启动前", fillcolor="#E7F7EF"];
+    termonly [label="可选 terminal-restore-only\n保存 termios + alternate stack", fillcolor="#E7F7EF"];
+    install [label="install(config)\n创建/截断 last-crash.bin\n注册平台 handler", fillcolor="#E7F7EF"];
+  }
+  subgraph cluster_crash {
+    label="Crash Signal Path（async-signal-safe）"; color="#F2A6A6"; style="rounded,filled"; fillcolor="#FFF7F7";
+    signal [label="Unix: SIGSEGV / SIGBUS\nWindows: access violation", fillcolor="#FFE9E9"];
+    capture [label="捕获 signal / si_code / fault addr\n时间戳 / 版本 / 指令指针\n最佳努力 frame-pointer walk", fillcolor="#FFE9E9"];
+    write [label="写二进制 CrashBlob\n避免堆分配与复杂运行时", fillcolor="#FFE9E9"];
+    restore [label="恢复终端 escape + termios\n随后恢复默认处理并重新触发", fillcolor="#FFE9E9"];
+  }
+  check -> parse -> sym -> report -> early;
+  early -> termonly -> install;
+  install -> signal [label="运行期间"];
+  signal -> capture -> write -> restore;
+  restore -> check [label="下一次进程启动", style=dashed];
+  caveat [label="限制：musl release 可记录 signal/address/version，但可能跳过 frame capture；回溯为 best-effort。", shape=note, fillcolor="#FFF8E8", color="#F2C66D"];
+  capture -> caveat [style=dashed, arrowhead=none];
+
+}

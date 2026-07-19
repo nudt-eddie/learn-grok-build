@@ -1,0 +1,35 @@
+flowchart LR
+    subgraph Tools["Tool System"]
+        direction TB
+        Read[Read Tool]
+        Write[Write Tool]
+        Bash[Bash Tool]
+        Glob[Glob Tool]
+        Grep[Grep Tool]
+        Edit[Edit Tool]
+        Search[Search Tool]
+        Fetch[Fetch Tool]
+    end
+
+    subgraph Execution["Execution Layer"]
+        Sandbox[Sandbox Engine]
+        Policies[Security Policies]
+        Limits[Resource Limits]
+    end
+
+    subgraph Hooks["Hooks Integration"]
+        Pre[Pre-Tool Hooks]
+        Post[Post-Tool Hooks]
+        Events[Event System]
+    end
+
+    Tools --> Pre
+    Pre --> Sandbox
+    Sandbox --> Policies
+    Sandbox --> Limits
+    Policies --> Post
+    Post --> Events
+
+    style Sandbox fill:#4ecdc4
+    style Pre fill:#ffe66d
+    style Post fill:#ffe66d

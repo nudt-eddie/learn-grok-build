@@ -1,0 +1,38 @@
+digraph G {
+  graph [bgcolor="#FCFDFE", pad="0.25", nodesep="0.45", ranksep="0.65", splines=ortho, fontname="Noto Sans CJK SC", fontsize=22, labelloc=t, labeljust=l, label="07. 对话压缩：Full-Replace Compaction 源码流程"];
+  node [shape=box, style="rounded,filled", fontname="Noto Sans CJK SC", fontsize=13, color="#CBD5E1", penwidth=1.2, margin="0.16,0.10", fillcolor="#FFFFFF", fontcolor="#172033"];
+  edge [fontname="Noto Sans CJK SC", fontsize=11, color="#64748B", penwidth=1.35, arrowsize=0.75, fontcolor="#475569"];
+
+  subgraph cluster_host {
+    label="产品宿主（xai-grok-shell / ChatState）"; color="#BFD7FF"; style="rounded,filled"; fillcolor="#F3F8FF";
+    trigger [label="触发策略\nToken 占用达到阈值\n默认自动压缩阈值", fillcolor="#E8F1FF"];
+    snapshot [label="获取会话快照\nconversation + active agent state\n最后用户查询", fillcolor="#E8F1FF"];
+    commit [label="原子提交新历史\n更新 token / 事件 / 持久化", fillcolor="#E8F1FF"];
+    hostnote [label="宿主负责：触发、传输、重放/回滚、\n状态提交、指标与持久化", shape=note, fillcolor="#FFF8E8", color="#F2C66D"];
+  }
+  subgraph cluster_core {
+    label="xai-grok-compaction：transport-agnostic compaction-core"; color="#C8B8F5"; style="rounded,filled"; fillcolor="#FAF7FF";
+    context [label="FullReplaceContext\nCompactionItem / Factory\nTokenCounter / Observer", fillcolor="#F0EAFE"];
+    prompt [label="1. build_summary_prompt\n选择 PromptKind\n拼接用户查询与 reminder", fillcolor="#F0EAFE"];
+    sample [label="2. CompactionSampler\n流式采样 + 重试\n独立 compaction model", fillcolor="#F0EAFE"];
+    clean [label="3. 清洗与校验\n格式化 summary\n检测退化/空摘要", fillcolor="#F0EAFE"];
+    assemble [label="4. assemble_compacted_history\n全量替换，不保留 tail\n重建 fresh history", fillcolor="#F0EAFE"];
+  }
+  subgraph cluster_failure {
+    label="失败分类与恢复"; color="#F6B6B6"; style="rounded,filled"; fillcolor="#FFF7F7";
+    classify [label="FailureKind\nHTTP / stream error\ncontext length error", fillcolor="#FFE9E9"];
+    retry [label="瞬态错误\n按策略重试", fillcolor="#FFF1E6", color="#F0B27A"];
+    abort [label="确定性错误 / 退化摘要\n保留原历史并上报", fillcolor="#FFE9E9"];
+  }
+  trigger -> snapshot -> context -> prompt -> sample -> clean -> assemble -> commit;
+  sample -> classify [label="失败"];
+  classify -> retry [label="transient"];
+  retry -> sample;
+  classify -> abort [label="deterministic"];
+  clean -> abort [label="degenerate"];
+  hostnote -> trigger [style=dashed, arrowhead=none];
+  hostnote -> commit [style=dashed, arrowhead=none];
+  footer [label="源码要点：grok-build 使用 whole-session full-replace；与 Grok Chat 的 intra tail-keep / inter chunked 策略分离。", shape=note, fillcolor="#F8FAFC", color="#CBD5E1"];
+  assemble -> footer [style=dashed, arrowhead=none];
+
+}

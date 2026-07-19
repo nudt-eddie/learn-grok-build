@@ -1,0 +1,43 @@
+digraph G {
+  graph [bgcolor="#FCFDFE", pad="0.25", nodesep="0.45", ranksep="0.65", splines=ortho, fontname="Noto Sans CJK SC", fontsize=22, labelloc=t, labeljust=l, label="13. Plugins：多来源发现、Enable/Trust 双门控与 Marketplace 供应链"];
+  node [shape=box, style="rounded,filled", fontname="Noto Sans CJK SC", fontsize=13, color="#CBD5E1", penwidth=1.2, margin="0.16,0.10", fillcolor="#FFFFFF", fontcolor="#172033"];
+  edge [fontname="Noto Sans CJK SC", fontsize=11, color="#64748B", penwidth=1.35, arrowsize=0.75, fontcolor="#475569"];
+
+  subgraph cluster_sources {
+    label="插件来源与优先级（高 → 低）"; color="#8EB8F8"; style="rounded,filled"; fillcolor="#F4F8FF";
+    session [label="1. _meta.pluginDirs\n单会话、自动信任", fillcolor="#EAF2FF"];
+    cli [label="2. --plugin-dir\n单进程、自动信任", fillcolor="#EAF2FF"];
+    project [label="3. .grok/plugins\n项目级、需显式信任", fillcolor="#EAF2FF"];
+    userp [label="4. ~/.grok/plugins\n用户级、自动信任", fillcolor="#EAF2FF"];
+    custom [label="5. config [plugins].paths\n按位置决定信任", fillcolor="#EAF2FF"];
+  }
+  subgraph cluster_discovery {
+    label="发现与组件清单"; color="#A7D7C5"; style="rounded,filled"; fillcolor="#F3FBF7";
+    manifest [label="plugin.json（可选）\n覆盖路径 + 元数据", fillcolor="#E7F7EF"];
+    convention [label="Convention directories\nskills/ commands/ agents/ hooks/\n.mcp.json / .lsp.json", fillcolor="#E7F7EF"];
+    resolve [label="同名冲突解析\n高优先级位置胜出", fillcolor="#E7F7EF"];
+    enable [label="Enable 状态\n决定是否加载声明式组件", fillcolor="#E7F7EF"];
+  }
+  subgraph cluster_trust {
+    label="Enable 与 Trust 分离"; color="#F1C58B"; style="rounded,filled"; fillcolor="#FFF9F1";
+    declarative [label="Skills / Slash Commands / Agents\n启用后可加载", fillcolor="#FFF0D8"];
+    executable [label="Hooks / MCP / LSP\n只有 Trusted 才激活", fillcolor="#FFE9E9", color="#F2A6A6"];
+    env [label="Plugin Hook 环境\nGROK_PLUGIN_ROOT\nGROK_PLUGIN_DATA", fillcolor="#FFF0D8"];
+  }
+  subgraph cluster_market {
+    label="Marketplace / 安装更新供应链"; color="#C9B5F4"; style="rounded,filled"; fillcolor="#FAF7FF";
+    source [label="Git / GitHub shorthand / Local path\nMarketplace source", fillcolor="#F0EAFE"];
+    pin [label="require_sha tighten-only\n远程安装需完整 commit SHA", fillcolor="#F0EAFE"];
+    install [label="install / update / validate\n同步 checkout + inventory", fillcolor="#F0EAFE"];
+  }
+  agent [label="AgentBuilder / Pager Modal\n合并 Skills、Agents、Hooks、MCP/LSP\n展示来源标签", fillcolor="#EAF2FF", color="#8EB8F8"];
+  session -> manifest; cli -> manifest; project -> manifest; userp -> manifest; custom -> manifest;
+  manifest -> convention -> resolve -> enable;
+  enable -> declarative -> agent;
+  enable -> executable [label="Trusted?"];
+  executable -> env -> agent;
+  source -> pin -> install -> manifest;
+  blocked [label="未信任插件：仍可被发现与展示，但可执行组件保持 blocked，防止仓库代码直接在本机运行。", shape=note, fillcolor="#FFF8E8", color="#F2C66D"];
+  executable -> blocked [style=dashed, arrowhead=none];
+
+}

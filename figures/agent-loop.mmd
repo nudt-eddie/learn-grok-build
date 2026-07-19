@@ -1,0 +1,22 @@
+flowchart TD
+    Start([User Request]) --> Parse[Parse Request]
+
+    Parse --> Hooks{Pre-Request Hooks}
+    Hooks -->|Allow| Build[Build Discovery]
+    Hooks -->|Deny| Reject([Reject Request])
+
+    Build --> Model[LLM Model]
+    Model --> Tools{Select Tools}
+
+    Tools -->|Tool Call| Sandbox[Execute in Sandbox]
+    Sandbox -->|Result| HooksPT{Post-Tool Hooks}
+    HooksPT -->|Continue| Model
+
+    Tools -->|Final Response| Compact[Compaction Check]
+    Compact -->|Compact if needed| Memory[Update Memory]
+    Memory --> Session[Update Session]
+    Session --> UI[Render UI]
+    UI --> End([Response to User])
+
+    style Reject fill:#ff6b6b
+    style Sandbox fill:#4ecdc4
