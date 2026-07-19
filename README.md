@@ -75,11 +75,12 @@
 
 ---
 
-### 10-Section Structure
+### Documentation Structure
 
 | Section | CN | EN | Figures |
 |---------|----|----|---------|
-| 01 总体架构 | [README](docs/01-architecture/README.md) | [en.md](docs/01-architecture/en.md) | 01_source_architecture.png, grok解读.png, 技术架构和协议系统图.png |
+| 00 方法论 | [README](docs/00-methodology/README.md) | - | - |
+| 01 总体架构 | [README](docs/01-architecture/README.md) | [en.md](docs/01-architecture/en.md) | 01_source_architecture.png |
 | 02 启动流程 | [README](docs/02-startup/README.md) | [en.md](docs/02-startup/en.md) | 02_agent_build_discovery.png |
 | 03 请求流程 | [README](docs/03-request-flow/README.md) | [en.md](docs/03-request-flow/en.md) | 03_turn_tool_sequence.png |
 | 04 Agent Loop | [README](docs/04-agent-loop/README.md) | [en.md](docs/04-agent-loop/en.md) | - |
