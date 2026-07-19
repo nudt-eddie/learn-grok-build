@@ -7,6 +7,7 @@
 **路径**: `source/crates/codegen/xai-grok-pager-bin/src/main.rs`
 
 ```rust
+// SOURCE: source/crates/codegen/xai-grok-pager-bin/src/main.rs
 fn main() {
     // 初始化jemalloc内存分配器
     xai_grok_pager_minimal::install();
@@ -34,6 +35,7 @@ fn main() {
 ### 1.2 异步主函数: async_main()
 
 ```rust
+// SOURCE: source/crates/codegen/xai-grok-pager-bin/src/main.rs
 async fn async_main() -> Result<()> {
     let mut args = PagerArgs::parse_and_apply_cwd()?;
     
@@ -67,6 +69,7 @@ async fn async_main() -> Result<()> {
 ### 2.2 配置加载函数
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/config/mod.rs
 // 加载合并后的有效配置
 pub fn load_effective_config() -> Result<toml::Value> {
     // 加载各层配置并深度合并
@@ -79,6 +82,7 @@ AgentConfig::new_from_toml_cfg(&raw_config)
 ### 2.3 配置应用流程
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/agent/app.rs
 // 1. 基础配置加载
 let raw_config = xai_grok_shell::config::load_effective_config()?;
 
@@ -105,6 +109,7 @@ agent_config.resolve_runtime_fields(&RuntimeResolutionContext {
 ### 3.1 Tokio运行时
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/agent/app.rs
 // 主程序使用多线程运行时
 let runtime = tokio::runtime::Builder::new_multi_thread()
     .enable_all()
@@ -114,6 +119,7 @@ let runtime = tokio::runtime::Builder::new_multi_thread()
 ### 3.2 Telemetry初始化
 
 ```rust
+// SOURCE: source/crates/xai-grok-telemetry/src/lib.rs
 fn init_tracing_simple(app_entrypoint: &'static str) {
     let registry = tracing_subscriber::registry()
         .with(fmt_layer.with_filter(env_filter))
@@ -129,6 +135,7 @@ fn init_tracing_simple(app_entrypoint: &'static str) {
 ### 3.3 Sentry监控
 
 ```rust
+// SOURCE: source/crates/xai-grok-telemetry/src/sentry.rs
 let _sentry_guard = xai_grok_telemetry::sentry::init(
     xai_grok_telemetry::sentry::Config {
         client: "grok-pager",
@@ -142,6 +149,7 @@ let _sentry_guard = xai_grok_telemetry::sentry::init(
 ### 3.4 AuthManager初始化
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/auth/mod.rs
 // 创建认证管理器
 let auth_manager = Arc::new(agent_config.create_auth_manager());
 
@@ -167,9 +175,10 @@ auth_manager.start_system_power_listener();
 
 ### 4.2 Pager TUI模式
 
-**入口**: `xai_grok_pager::app::run(args, bg_update_rx)`
+**入口**: `source/crates/xai-grok-pager/src/app/mod.rs`
 
 ```rust
+// SOURCE: source/crates/xai-grok-pager/src/app/mod.rs
 // 1. 解析参数
 let args = PagerArgs::parse_and_apply_cwd()?;
 
@@ -184,9 +193,10 @@ xai_grok_pager::app::run(args, bg_update_rx).await
 
 ### 4.3 Stdio Agent模式
 
-**入口**: `xai_grok_shell::agent::app::run_stdio_agent()`
+**入口**: `source/crates/xai-grok-shell/src/agent/app.rs`
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/agent/app.rs
 pub async fn run_stdio_agent(...) -> anyhow::Result<()> {
     // 1. 注册文件系统监控运行时
     register_fs_watch_runtime();
@@ -217,9 +227,10 @@ pub async fn run_stdio_agent(...) -> anyhow::Result<()> {
 
 ### 4.4 Headless模式
 
-**入口**: `xai_grok_shell::agent::app::run_headless()`
+**入口**: `source/crates/xai-grok-shell/src/agent/app.rs`
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/agent/app.rs
 pub async fn run_headless(...) -> anyhow::Result<()> {
     // 1. 注册运行时
     register_fs_watch_runtime();
@@ -257,7 +268,7 @@ pub async fn run_headless(...) -> anyhow::Result<()> {
 
 ### 4.5 Leader模式
 
-**入口**: `xai_grok_shell::agent::app::run_leader()`
+**入口**: `source/crates/xai-grok-shell/src/agent/app.rs`
 
 **启动序列**:
 
@@ -288,6 +299,7 @@ Phase 8: LocalSet运行
 ```
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/leader/mod.rs
 pub async fn run_leader(...) -> anyhow::Result<()> {
     // 锁获取
     let lock = LeaderLock::new(ws_url);
@@ -347,6 +359,7 @@ pub async fn run_leader(...) -> anyhow::Result<()> {
 ### 5.1 MvpAgent初始化
 
 ```rust
+// SOURCE: source/crates/xai-grok-shell/src/agent/mvp_agent/mod.rs
 let agent = MvpAgent::new(gateway, &agent_config, auth_manager, prefetched_models)
     .unwrap_or_else(exit_on_config_error);
 ```
@@ -354,6 +367,7 @@ let agent = MvpAgent::new(gateway, &agent_config, auth_manager, prefetched_model
 ### 5.2 ACP连接建立
 
 ```rust
+// SOURCE: source/crates/xai-acp/src/lib.rs
 // ACP (Agent Client Protocol) 连接
 let (conn, handle_io) = acp::AgentSideConnection::new(
     agent,           // Agent处理器
@@ -435,6 +449,7 @@ tokio::task::spawn_local(
 ### 7.1 内存配置
 
 ```rust
+// SOURCE: source/crates/xai-grok-agent/src/config/models.rs
 pub struct MemoryConfig {
     pub enabled: bool,
     pub index: MemoryIndexConfig,
@@ -450,6 +465,7 @@ pub struct MemoryConfig {
 ### 7.2 插件配置
 
 ```rust
+// SOURCE: source/crates/xai-grok-agent/src/config/models.rs
 pub struct PluginsConfig {
     pub paths: Vec<String>,      // 插件目录
     pub disabled: Vec<String>,   // 禁用的插件
@@ -460,6 +476,7 @@ pub struct PluginsConfig {
 ### 7.3 模型配置
 
 ```rust
+// SOURCE: source/crates/xai-grok-agent/src/config/models.rs
 pub struct ModelOverrideConfig {
     pub web_search: String,           // 网络搜索模型
     pub session_summary: Option<String>, // 会话摘要模型
@@ -472,11 +489,13 @@ pub struct ModelOverrideConfig {
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    xai-grok-pager-bin                       │
+│         source/crates/codegen/xai-grok-pager-bin/           │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     xai-grok-shell                          │
+│            source/crates/xai-grok-shell/                    │
 │  ├─ agent/app.rs      - Agent启动入口                       │
 │  ├─ agent/mvp_agent/ - MVP Agent实现                        │
 │  ├─ auth/            - 认证管理                             │
@@ -488,6 +507,7 @@ pub struct ModelOverrideConfig {
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     xai-grok-agent                          │
+│              source/crates/xai-grok-agent/                  │
 │  ├─ Agent定义和解析                                          │
 │  ├─ 工具系统                                                │
 │  ├─ 系统提示组装                                            │
@@ -497,6 +517,7 @@ pub struct ModelOverrideConfig {
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     xai-chat-state                          │
+│               source/crates/xai-chat-state/                 │
 │  ├─ 对话状态管理                                            │
 │  ├─ 会话持久化                                              │
 │  └─ 压缩转录                                               │

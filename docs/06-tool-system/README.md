@@ -3,13 +3,16 @@
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Core Data Structures](#core-data-structures)
-3. [Tool Trait and Implementation](#tool-trait-and-implementation)
-4. [Key Flows](#key-flows)
-5. [API Interfaces](#api-interfaces)
-6. [Design Patterns](#design-patterns)
-7. [Streaming Contract](#streaming-contract)
-8. [Error Handling](#error-handling)
+2. [Why This Design](#why-this-design)
+3. [When to Use](#when-to-use)
+4. [Core Data Structures](#core-data-structures)
+5. [Tool Trait and Implementation](#tool-trait-and-implementation)
+6. [Key Flows](#key-flows)
+7. [API Interfaces](#api-interfaces)
+8. [Design Patterns](#design-patterns)
+9. [Streaming Contract](#streaming-contract)
+10. [Error Handling](#error-handling)
+11. [Source Evidence](#source-evidence)
 
 ---
 
@@ -55,6 +58,73 @@ The Grok Build tool system is a modular framework for executing AI agent tools v
 │  └─────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Why This Design
+
+### 1. Trait-Based Architecture for Type Safety
+
+The `Tool` trait uses associated types for `Args` and `Output`, enabling compile-time validation while maintaining dynamic dispatch via `ToolDyn`. This eliminates runtime type casting errors and enables the code generator to produce type-safe adapters automatically.
+
+### 2. Streaming-First Model
+
+Tools can emit progressive updates via `ToolStream<Progress*, Terminal>`. This design supports:
+- Long-running operations (bash, search) that need to report progress
+- Real-time feedback to users without waiting for completion
+- Chunked output that respects terminal frame boundaries and UTF-8 boundaries
+
+### 3. Context Extensions Pattern
+
+`TypedExtensions` allows tools to receive contextual information without tight coupling:
+- Behavioral flags can be injected (e.g., behavior versions)
+- Session-scoped resources are available (working directory, user info)
+- New context fields can be added without modifying all tool signatures
+
+### 4. Three-State Session Binding
+
+The `Option<Vec<SessionId>>` pattern avoids ambiguity:
+- `None`: Preserve existing bindings
+- `Some(vec![])`: Explicitly unbind all
+- `Some(vec![s1, ...])`: Replace bindings
+
+### 5. Open Extension Store
+
+`TypedExtensions` uses `TypeId` as keys, enabling type-safe access to arbitrary context data without string-based lookups or interface bloat.
+
+### 6. UUID v7 for Call IDs
+
+ToolCallId uses UUID v7 for time-ordered generation, enabling efficient indexing and debugging of tool invocations across distributed systems.
+
+---
+
+## When to Use
+
+### Use Tool::run() when:
+- Tool execution is synchronous or completes quickly
+- No intermediate progress needs to be reported
+- Simple one-shot operations (read file, validate input)
+
+### Use Tool::execute() when:
+- Tool performs long-running operations (bash, build, search)
+- Real-time progress updates improve user experience
+- Output may be truncated and streamed incrementally
+- The tool needs to check for cancellation during execution
+
+### Add a new tool implementation when:
+- You need to extend AI capabilities with new operations
+- Existing tools do not cover the required functionality
+- The operation can be modeled as input args + output result
+
+### Use ToolFamilies when:
+- Multiple variants exist for the same tool (e.g., ReadFile with different encoding support)
+- Tool behavior needs to differ based on context or model version
+- You need to provide a unified interface while supporting specialized implementations
+
+### Use MCP servers when:
+- Tools are hosted in external processes or services
+- Cross-service integration is required
+- Tools should be managed independently from the main application
 
 ---
 
@@ -995,3 +1065,65 @@ where
 | `xai-grok-workspace` | `crates/codegen/` | Workspace tools |
 | `xai-computer-hub-core` | `crates/common/` | Hub core logic |
 | `xai-computer-hub-sdk` | `crates/common/` | SDK for tool servers |
+
+---
+
+## Source Evidence
+
+All documentation in this file is grounded in concrete source code from the Grok Build repository:
+
+### Tool Trait Definition
+- **Source**: `source/crates/common/xai-tool-runtime/src/tool.rs`
+- **Evidence**: `pub trait Tool: Send + Sync` with associated `Args` and `Output` types
+
+### ToolId Structure
+- **Source**: `source/crates/common/xai-tool-protocol/src/ids.rs`
+- **Evidence**: Format validation `validate_tool_id()`, constructor `ToolId::new()`
+
+### ToolCallId (UUID v7)
+- **Source**: `source/crates/common/xai-tool-protocol/src/ids.rs`
+- **Evidence**: `ToolCallId::new_v7()` for time-ordered identifier generation
+
+### TypedExtensions
+- **Source**: `source/crates/common/xai-tool-runtime/src/extensions.rs`
+- **Evidence**: `TypedExtensions::insert<T>()` and `TypedExtensions::get<T>()` with `TypeId` keys
+
+### ToolStream Invariant
+- **Source**: `source/crates/common/xai-tool-runtime/src/stream.rs`
+- **Evidence**: `ToolStreamItem<T>` enum with `Progress` and `Terminal` variants
+
+### ToolDispatch Trait
+- **Source**: `source/crates/common/xai-tool-runtime/src/dispatch.rs`
+- **Evidence**: `call()` and `call_terminal()` methods for tool invocation
+
+### ToolError Variants
+- **Source**: `source/crates/common/xai-tool-runtime/src/error.rs`
+- **Evidence**: Error variants including `InvalidArguments`, `Execution`, `Cancelled`, `PermissionDenied`
+
+### JSON-RPC Methods
+- **Source**: `source/crates/common/xai-tool-protocol/src/methods.rs`
+- **Evidence**: `tools.list`, `tool.call`, `tool.cancel`, `tool.call_progress`, etc.
+
+### Registration Structures
+- **Source**: `source/crates/common/xai-tool-runtime/src/registration.rs`
+- **Evidence**: `ToolRegistration`, `ToolServerRegistration`, `RegistrationOutcome` enums
+
+### ToolFamily Pattern
+- **Source**: `source/crates/common/xai-tool-runtime/src/family.rs`
+- **Evidence**: `ToolFamily` trait with `get_tool()` and `variants()` methods
+
+### streaming_helpers
+- **Source**: `source/crates/common/xai-tool-runtime/src/streaming_helpers.rs`
+- **Evidence**: `with_progress()`, `terminal_only()`, `stream_chunk()` functions
+
+### Tool Implementations (Examples)
+- **Source**: `source/crates/codegen/xai-grok-tools/src/implementations/`
+- **Evidence**: `ReadFileTool`, `SearchTool`, `BashTool`, `WebFetchTool` implementations
+
+### MCP Server Support
+- **Source**: `source/crates/codegen/xai-grok-pager/src/scrollback/blocks/tool/`
+- **Evidence**: MCP protocol integration for external tool servers
+
+### Computer Hub Core
+- **Source**: `source/crates/common/xai-computer-hub-core/`
+- **Evidence**: Hub service handling tool registration, dispatch, and session management

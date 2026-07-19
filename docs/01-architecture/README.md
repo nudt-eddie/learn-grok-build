@@ -1,12 +1,14 @@
 # Grok Build 总体架构文档
 
+<!-- SOURCE: https://github.com/xAI-org/grok-build -->
+
 ## 项目概述
 
 Grok Build 是 xAI 开发的高性能 AI 代码助手基础设施，采用 Rust 实现，核心设计理念是**模块化代码生成**与**安全沙箱执行**。系统通过 Actor 模型管理对话状态，基于 Tree-sitter 构建代码图索引，支持 Btrfs 快照实现 O(1) 工作树创建，并通过 Agent-Client Protocol (ACP) 实现客户端-服务器双向通信。
 
-### 设计目标
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/xai-chat-state -->
 
-![Architecture](../figures/architecture.mmd)
+### 设计目标
 
 - **高性能**: 全链路 Rust 实现，避免 GC 停顿，确保低延迟工具调用
 - **安全隔离**: Workspace 运行在远程沙箱，通过 capability mode 限制权限
@@ -14,6 +16,8 @@ Grok Build 是 xAI 开发的高性能 AI 代码助手基础设施，采用 Rust 
 - **可追溯**: Hunk 追踪支持对话 rewind 和快照恢复
 
 ---
+
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/xai-chat-state -->
 
 ## 技术栈
 
@@ -44,6 +48,8 @@ ptyctl                  PTY 控制服务
 ```
 
 ---
+
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/codegen -->
 
 ## Crate 架构地图
 
@@ -121,6 +127,8 @@ xai-grok-workspace → xai-hunk-tracker (变更追踪)
 
 ---
 
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/xai-grok-workspace -->
+
 ## 三种运行模式
 
 ### 1. Local 模式（嵌入式）
@@ -191,6 +199,8 @@ WorkspaceOps 同时支持 Local 和 Proxy 模式，通过 WebSocket 代理到远
 **适用场景**: 需要连接远程沙箱但保持本地开发体验
 
 ---
+
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/xai-grok-agent -->
 
 ## 核心组件描述
 
@@ -493,6 +503,8 @@ WorkspaceSession::update_tool_config(config) // 热重载工具集
 
 ---
 
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/xai-grok-tools -->
+
 ## 设计模式总结
 
 ### 1. Actor 模式
@@ -596,6 +608,8 @@ WorkspaceHandle::drop_session(id)        // 销毁会话
 
 ---
 
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/xai-grok-workspace -->
+
 ## 关键流程详解
 
 ### 会话创建流程（Session Bind）
@@ -651,6 +665,8 @@ WorkspaceHandle::drop_session(id)        // 销毁会话
 
 ---
 
+<!-- SOURCE: https://github.com/xAI-org/grok-build/blob/main/xai-grok-agent -->
+
 ## 重要设计决策
 
 | 决策 | 说明 |
@@ -665,7 +681,4 @@ WorkspaceHandle::drop_session(id)        // 销毁会话
 | **能力偏序关系** | CapabilityMode.is_subset_of() 确保 fork 时能力不扩大 |
 | **双工通信分离** | Workspace Server Provider（暴露工具）和 Consumer（代理工具）方向分离 |
 
----
-
-*文档版本: 1.0.0*  
-*来源: Grok Build 源码分析*
+*文档版本: 1.0.0*

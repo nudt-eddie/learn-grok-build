@@ -603,6 +603,8 @@ pub struct Credentials {
 
 ### 压缩算法流程
 
+> SOURCE: `xai-chat-state/src/actor/mutations.rs`
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     Compaction Flow                                  │
@@ -653,6 +655,8 @@ pub struct Credentials {
 
 ### CompactionMode
 
+> SOURCE: `xai-chat-state/src/compaction_mode.rs`
+
 定义压缩后模型如何访问历史详情：
 
 ```rust
@@ -674,6 +678,8 @@ pub enum CompactionDetail {
 ```
 
 ### 压缩上下文
+
+> SOURCE: `xai-chat-state/src/compaction_utils.rs`
 
 压缩时捕获的会话状态：
 
@@ -697,6 +703,8 @@ pub struct CompactionStateContext {
 ```
 
 ### PruningConfig 修剪策略
+
+> SOURCE: `xai-chat-state/src/compaction_utils.rs`
 
 工具结果修剪策略影响压缩质量：
 

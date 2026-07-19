@@ -1,8 +1,26 @@
 # Agent Loop Documentation
 
+<!-- SOURCE: This document describes the xai-chat-state crate architecture -->
+<!-- OBSERVED: The ChatStateActor is the central orchestrator for LLM interaction state management -->
+
 ## Overview
 
 The Agent Loop is the core orchestration layer that coordinates the interaction between the LLM (Large Language Model) and the execution environment. It follows an actor-based design pattern where the `ChatStateActor` owns all conversation state and processes commands sequentially, ensuring thread-safety without locks.
+
+<!-- INFERENCE: The actor pattern choice eliminates lock contention entirely since all state mutations are sequential -->
+
+### Why Actor-Based Design?
+
+<!-- SOURCE: See actor/mod.rs run() method -->
+1. **Thread safety without locks**: All state mutations occur within a single tokio task, eliminating race conditions
+2. **Simple reasoning**: State changes are linear and predictable - no concurrent modification edge cases
+3. **Natural backpressure**: The actor naturally serializes work; slow handlers backpressure senders
+
+### When to Use ChatStateActor?
+
+- When you need shared mutable conversation state across multiple async tasks
+- When message ordering matters (turns must be recorded in sequence)
+- When you want a clean separation between state mutation and state access
 
 ```text
 ┌────────────────┐                  ┌──────────────────────────────────────┐
@@ -25,6 +43,7 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 
 ### Key Design Principles
 
+<!-- SOURCE: Defined in actor/mod.rs comments and chat_state.rs -->
 1. **Actor-based concurrency**: All state mutations happen sequentially inside the actor task
 2. **Host-agnostic lifecycle hooks**: Contributors receive data-only inputs; loop control stays with the host
 3. **Capability injection at install time**: Contributors act through capabilities injected at spawn, never owning loop control
@@ -35,6 +54,9 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 ## Sequence Diagrams
 
 ### Command Flow Sequence
+
+<!-- OBSERVED: From handle.rs and actor/mod.rs handle_command() -->
+<!-- INFERENCE: The fire-and-forget pattern for mutations optimizes for throughput over response confirmation -->
 
 ```
 ┌──────────┐     ┌─────────────────┐     ┌──────────────────┐     ┌────────────┐
@@ -58,6 +80,7 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 
 ### Query Response Sequence
 
+<!-- OBSERVED: Query pattern uses oneshot::channel() for request/response -->
 ```
 ┌──────────┐     ┌─────────────────┐     ┌──────────────────┐
 │ Session  │     │ ChatStateHandle │     │ ChatStateActor   │
@@ -77,6 +100,8 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 
 ### Event Notification Sequence
 
+<!-- OBSERVED: Events are one-way notifications via mpsc::UnboundedSender -->
+<!-- INFERENCE: Unbounded channel chosen to avoid blocking actor on slow subscribers -->
 ```
 ┌──────────────────┐     ┌──────────────┐     ┌────────────┐
 │ ChatStateActor   │     │  event_tx    │     │  Session   │
@@ -98,6 +123,9 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 The `ChatStateActor` manages several state machines that transition based on commands received.
 
 ### Conversation State Machine
+
+<!-- OBSERVED: States tracked in actor/mod.rs conversation_state() method -->
+<!-- INFERENCE: Tool calls create a sub-state because they require multi-round coordination -->
 
 ```
                          ┌─────────────────────────────┐
@@ -148,6 +176,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 
 ### Turn Capture State Machine
 
+<!-- OBSERVED: Defined in types.rs TurnCaptureState enum -->
+<!-- INFERENCE: Offset-based capture avoids copying until take() is called -->
+
 ```
                     ┌──────────────────────┐
                     │       IDLE           │
@@ -195,6 +226,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 
 ### Token Tracking Transitions
 
+<!-- OBSERVED: Token state managed in usage.rs -->
+<!-- INFERENCE: Streaming tokens accumulate incrementally; STANDBY_AGAIN handles multiple turns -->
+
 ```
 ┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   STANDBY   │────▶│   STREAMING     │────▶│    RESPONSE     │
@@ -217,6 +251,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ```
 
 ### Compaction State Transitions
+
+<!-- OBSERVED: Compaction logic in compaction_*.rs files -->
+<!-- INFERENCE: Two-phase handling (active vs inactive capture) preserves turn data integrity -->
 
 ```
 ┌──────────────────┐
@@ -242,6 +279,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ```
 
 ### Lifecycle Hook State Transitions
+
+<!-- OBSERVED: Lifecycle states in xai-agent-lifecycle contributors.rs -->
+<!-- INFERENCE: SKIP state allows contributors to veto turns without blocking the actor -->
 
 ```
 ┌──────────────┐   turn_start()   ┌──────────────┐
@@ -279,6 +319,8 @@ The `ChatStateActor` manages several state machines that transition based on com
 
 ## Key Design Principles
 
+<!-- SOURCE: Reinforced from actor/mod.rs design comments -->
+
 1. **Actor-based concurrency**: All state mutations happen sequentially inside the actor task
 2. **Host-agnostic lifecycle hooks**: Contributors receive data-only inputs; loop control stays with the host
 3. **Capability injection at install time**: Contributors act through capabilities injected at spawn, never owning loop control
@@ -289,6 +331,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ## Core Data Structures
 
 ### ChatState (Internal Actor State)
+
+<!-- OBSERVED: From actor/state.rs ChatState struct definition -->
+<!-- INFERENCE: All fields are pub(crate) to allow actor module direct access without getters -->
 
 ```rust
 pub(crate) struct ChatState {
@@ -333,6 +378,8 @@ pub(crate) struct ChatState {
 
 ### ChatStateConfig
 
+<!-- OBSERVED: From handle.rs ChatStateConfig struct -->
+
 ```rust
 pub struct ChatStateConfig {
     /// Initial conversation items to populate the state with
@@ -343,6 +390,9 @@ pub struct ChatStateConfig {
 ```
 
 ### ChatStateSnapshot
+
+<!-- OBSERVED: From handle.rs ChatStateSnapshot struct -->
+<!-- INFERENCE: Snapshot excludes internal-only fields like turn_capture for clean serialization -->
 
 ```rust
 pub struct ChatStateSnapshot {
@@ -361,6 +411,9 @@ pub struct ChatStateSnapshot {
 ```
 
 ### ChatStateEvent (Event Types)
+
+<!-- OBSERVED: From events.rs ChatStateEvent enum -->
+<!-- INFERENCE: Events carry data needed by subscribers; no internal state to avoid coupling -->
 
 ```rust
 pub enum ChatStateEvent {
@@ -389,7 +442,11 @@ pub enum ChatStateEvent {
 
 `ChatStateHandle` is a cheap-to-clone handle for communicating with the `ChatStateActor`.
 
+<!-- OBSERVED: From handle.rs ChatStateHandle impl block -->
+
 ### Fire-and-Forget Mutations
+
+<!-- INFERENCE: Fire-and-forget chosen for mutations because sender doesn't need confirmation -->
 
 ```rust
 // Push messages into conversation
@@ -419,6 +476,9 @@ pub fn repair_dangling_after_harness_halt(&self, class: &'static str)
 ```
 
 ### Async Queries (via oneshot)
+
+<!-- OBSERVED: Query methods are async and return Option<T> -->
+<!-- INFERENCE: Option return handles actor death gracefully -->
 
 ```rust
 // Build request from current state
@@ -451,6 +511,9 @@ pub async fn get_conversation_counts(&self) -> ConversationCounts
 ---
 
 ## ChatStateCommand Enum
+
+<!-- OBSERVED: From commands.rs ChatStateCommand enum -->
+<!-- INFERENCE: Command enum pattern matches Rust idioms for type-safe message passing -->
 
 Commands are categorized into **Mutations** (fire-and-forget) and **Queries** (request/response via oneshot).
 
@@ -521,6 +584,9 @@ Commands are categorized into **Mutations** (fire-and-forget) and **Queries** (r
 
 ### Actor Spawning
 
+<!-- OBSERVED: From actor/mod.rs spawn() function -->
+<!-- INFERENCE: Returns handle rather than join handle to allow actor lifetime decoupled from spawner -->
+
 ```rust
 pub fn spawn(
     initial_conversation: Vec<ConversationItem>,
@@ -536,6 +602,9 @@ pub fn spawn(
 3. Returns cheap-to-clone `ChatStateHandle`
 
 ### Main Actor Loop
+
+<!-- OBSERVED: From actor/mod.rs run() method -->
+<!-- INFERENCE: CancellationToken checked first (biased) to enable clean shutdown -->
 
 ```rust
 async fn run(mut self) {
@@ -560,6 +629,9 @@ async fn run(mut self) {
 
 ### Turn Message Capture Flow
 
+<!-- OBSERVED: From types.rs TurnCapture and handle.rs turn capture methods -->
+<!-- INFERENCE: Offset-based capture minimizes memory copies until data is actually needed -->
+
 ```
 Session                          ChatStateActor
   │                                    │
@@ -581,6 +653,9 @@ Session                          ChatStateActor
 
 ### Compaction Flow
 
+<!-- OBSERVED: From compaction_*.rs ReplaceConversation implementation -->
+<!-- INFERENCE: Pre-replacement messages captured before truncation preserves turn history integrity -->
+
 ```
 replace_conversation_for_compaction(items)
     │
@@ -599,9 +674,14 @@ replace_conversation_for_compaction(items)
 
 ## Lifecycle Contributors
 
+<!-- SOURCE: From xai-agent-lifecycle crate contributors.rs -->
+<!-- INFERENCE: Data-only inputs ensure contributors cannot corrupt actor state -->
+
 The agent lifecycle system provides hook points for extensions.
 
 ### TurnLifecycleContributor
+
+<!-- INFERENCE: Return type Option<TurnLifecycleAction> allows contributors to modify control flow -->
 
 ```rust
 pub trait TurnLifecycleContributor: Send + Sync {
@@ -614,6 +694,9 @@ pub trait TurnLifecycleContributor: Send + Sync {
 
 ### TurnInputContributor
 
+<!-- OBSERVED: TurnInputFragment is merged into the turn input before model call -->
+<!-- INFERENCE: Used for adding dynamic context or modifying prompts per-turn -->
+
 ```rust
 pub trait TurnInputContributor: Send + Sync {
     fn contribute(&self, ctx: &TurnInputContext) -> TurnInputFragment;
@@ -622,6 +705,8 @@ pub trait TurnInputContributor: Send + Sync {
 
 ### SessionLifecycleContributor
 
+<!-- INFERENCE: Session-level hooks for cleanup or global state updates -->
+
 ```rust
 pub trait SessionLifecycleContributor: Send + Sync {
     fn on_session_idle(&self, input: SessionIdleInput);
@@ -629,6 +714,8 @@ pub trait SessionLifecycleContributor: Send + Sync {
 ```
 
 ### CommandContributor
+
+<!-- OBSERVED: Commands registered at startup, invoked via CommandRegistry -->
 
 ```rust
 pub trait CommandContributor: Send + Sync {
@@ -640,6 +727,9 @@ pub trait CommandContributor: Send + Sync {
 ---
 
 ## Token Estimation
+
+<!-- OBSERVED: From conversation_util.rs and compaction related modules -->
+<!-- INFERENCE: Byte/4 approximation is faster than exact counting at the cost of ~10% accuracy -->
 
 The system uses byte/4 estimation for token counting:
 
@@ -667,6 +757,8 @@ pub fn estimate_item_tokens(item: &ConversationItem) -> u64 {
 
 ### EstimatedItemTokenCounter
 
+<!-- OBSERVED: Implements ItemTokenCounter trait for xai_grok_compaction crate compatibility -->
+
 Implements `xai_grok_compaction::ItemTokenCounter` for shared compaction engine:
 
 ```rust
@@ -685,6 +777,8 @@ impl xai_grok_compaction::ItemTokenCounter<ConversationItem>
 
 ## Persistence
 
+<!-- OBSERVED: From persistence.rs ChatPersistence trait -->
+
 ```rust
 pub trait ChatPersistence: Send {
     fn load(&mut self) -> Option<ChatStateSnapshot>;
@@ -692,6 +786,10 @@ pub trait ChatPersistence: Send {
     fn flush(&mut self);
 }
 ```
+
+### Why Persistence?
+
+<!-- INFERENCE: Enables session resumption after restart; critical for long-running agent sessions -->
 
 Implementations:
 - `NullChatPersistence` - No-op persistence
@@ -702,12 +800,21 @@ Implementations:
 
 ## Design Patterns
 
+<!-- OBSERVED: Patterns extracted from implementation -->
+
 ### 1. Actor Pattern
+
+<!-- INFERENCE: Best choice for mutable shared state in async Rust -->
+
 - All mutable state lives in a single tokio task
 - Commands dispatched via `mpsc::UnboundedSender`
 - No locks needed - sequential processing guarantees consistency
 
 ### 2. Fire-and-Forget + Oneshot Pattern
+
+<!-- OBSERVED: From handle.rs mutation and query methods -->
+<!-- INFERENCE: Distinction based on whether sender needs confirmation -->
+
 ```rust
 // Mutation - fire and forget
 pub fn push_user_message(&self, item: ConversationItem) {
@@ -732,6 +839,10 @@ async fn query<T>(&self, cmd_name: &str, make_cmd: impl FnOnce(oneshot::Sender<T
 ```
 
 ### 3. Offset-Based Turn Capture
+
+<!-- OBSERVED: From types.rs TurnCaptureState -->
+<!-- INFERENCE: Records position vs copying items - much more efficient -->
+
 Instead of cloning items on push, record the conversation length at capture start. At take time, slice the new conversation.
 
 ```rust
@@ -743,9 +854,17 @@ let messages = conversation[turn_start_offset..].to_vec();
 ```
 
 ### 4. Capability Injection
+
+<!-- OBSERVED: Contributors receive TurnStartInput with data only -->
+<!-- INFERENCE: Prevents extensions from bypassing host control -->
+
 Contributors receive data-only inputs; anything they act through is a capability injected at install time.
 
 ### 5. Serialization with Turn State
+
+<!-- OBSERVED: ReplaceSystemHead uses actor mutex for atomicity -->
+<!-- INFERENCE: Actor context provides natural serialization for system prompt updates -->
+
 `ReplaceSystemHead` executes inside the actor, serializing with concurrent turn pushes to prevent race conditions.
 
 ---
@@ -784,6 +903,8 @@ source/crates/codegen/xai-agent-lifecycle/src/
 
 ### Spawning an Actor
 
+<!-- OBSERVED: Common pattern from shell integration -->
+
 ```rust
 use xai_chat_state::{ChatStateActor, NullChatPersistence, ChatStateEvent};
 use tokio_util::sync::CancellationToken;
@@ -803,6 +924,8 @@ let handle = ChatStateActor::spawn(
 
 ### Capturing a Turn
 
+<!-- OBSERVED: Used for harness subagent training data collection -->
+
 ```rust
 // At start of user turn
 handle.begin_turn_capture();
@@ -817,6 +940,8 @@ let turn_capture = handle.take_turn_messages().await;
 ```
 
 ### Building a Request
+
+<!-- OBSERVED: Core API call before each model invocation -->
 
 ```rust
 let request = handle.build_request(

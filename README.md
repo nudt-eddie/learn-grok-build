@@ -73,7 +73,103 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 核心模块
+---
+
+### 模块层次结构
+
+```
+grok-build/
+├── build/                          # 构建工具
+│   └── xai-proto-build             # Protobuf 代码生成
+│
+├── codegen/                        # 核心代码生成与运行时
+│   ├── xai-acp-lib                 # ACP 协议库 (Agent-Client Protocol)
+│   ├── xai-agent-lifecycle         # Agent 生命周期管理
+│   ├── xai-chat-state              # 对话状态机 (Actor 模型)
+│   │   ├── actor/                  # Actor 实现 (mod, mutations, queries, request_builder, state, tests)
+│   │   ├── compaction_*.rs         # 上下文压缩
+│   │   ├── persistence.rs          # 持久化 (Journal/SQLite)
+│   │   └── types.rs                # 类型定义
+│   ├── xai-codebase-graph          # 代码库图谱构建
+│   ├── xai-crash-handler           # 崩溃处理与恢复
+│   ├── xai-fast-worktree           # Git Worktree 快速切换
+│   ├── xai-file-utils              # 文件操作工具
+│   ├── xai-fsnotify                # 文件系统监控
+│   ├── xai-gix-status              # Git 状态封装 (基于 gix)
+│   ├── xai-grok-agent              # Agent Loop 主实现
+│   ├── xai-grok-announcements      # 公告系统
+│   ├── xai-grok-auth               # 认证授权
+│   ├── xai-grok-config             # 配置管理
+│   ├── xai-grok-config-types       # 配置类型定义
+│   ├── xai-grok-env                # 环境变量管理
+│   ├── xai-grok-hooks              # 生命周期钩子扩展
+│   ├── xai-grok-http               # HTTP 客户端/服务器
+│   ├── xai-grok-markdown           # Markdown 渲染
+│   ├── xai-grok-markdown-core      # Markdown 核心解析
+│   ├── xai-grok-mcp                # Model Context Protocol 支持
+│   ├── xai-grok-memory             # 混合记忆系统
+│   ├── xai-grok-mermaid            # Mermaid 图表生成
+│   ├── xai-grok-models             # 模型接口封装
+│   ├── xai-grok-pager              # 分页器 (TUI 渲染)
+│   ├── xai-grok-pager-pty-harness  # PTY 分页器
+│   ├── xai-grok-paths              # 路径工具
+│   ├── xai-grok-plugin-marketplace # 插件市场
+│   ├── xai-grok-sampler            # 采样器
+│   ├── xai-grok-sampling-types     # 采样类型
+│   ├── xai-grok-sandbox            # 进程隔离沙箱
+│   ├── xai-grok-secrets            # 密钥管理
+│   ├── xai-grok-shared             # 共享工具
+│   ├── xai-grok-shell              # Shell 交互
+│   ├── xai-grok-shell-base         # Shell 基础
+│   ├── xai-grok-shell-session-support # Shell 会话支持
+│   ├── xai-grok-subagent-resolution # 子 Agent 解析
+│   ├── xai-grok-telemetry          # 遥测数据
+│   ├── xai-grok-test-support       # 测试支持
+│   ├── xai-grok-tools              # 工具系统 (注册/发现/执行)
+│   ├── xai-grok-tools-api          # 工具 API
+│   ├── xai-grok-update             # 更新检查
+│   ├── xai-grok-version            # 版本管理
+│   ├── xai-grok-voice              # 语音支持
+│   ├── xai-grok-workspace          # 工作区管理 (文件/Git/权限)
+│   ├── xai-grok-workspace-client   # 工作区客户端
+│   ├── xai-grok-workspace-types    # 工作区类型定义
+│   ├── xai-hooks-plugins-types     # Hook/Plugin 类型
+│   ├── xai-hunk-tracker            # Hunk 追踪 (diff)
+│   ├── xai-mixpanel                # Mixpanel 集成
+│   ├── xai-prompt-queue            # Prompt 队列
+│   ├── xai-ratatui-inline          # 内联 TUI 组件
+│   ├── xai-ratatui-textarea        # TUI 文本域
+│   ├── xai-sqlite-journal          # SQLite 日志
+│   ├── xai-system-power            # 系统电源管理
+│   ├── xai-token-estimation        # Token 估算
+│   ├── xai-tracing-macros          # 追踪宏
+│   ├── xai-tty-utils               # TTY 工具
+│   ├── ptyctl                      # PTY 控制库
+│   └── ptyctl-cli                  # PTY 控制 CLI
+│
+├── common/                         # 通用组件
+│   ├── xai-circuit-breaker         # 熔断器
+│   ├── xai-computer-hub-core       # Computer Hub 核心
+│   ├── xai-computer-hub-mcp-adapter # MCP 适配器
+│   ├── xai-computer-hub-sdk        # SDK
+│   ├── xai-grok-compaction          # 压缩核心逻辑
+│   ├── xai-interjection-core       # 插断核心
+│   ├── xai-test-utils              # 测试工具
+│   ├── xai-tool-protocol           # 工具协议
+│   ├── xai-tool-runtime            # 工具运行时
+│   ├── xai-tool-types              # 工具类型定义
+│   └── xai-tracing                 # 追踪基础设施
+│
+└── third_party/                    # 第三方库
+    ├── dagre_rust                  # 图布局算法
+    ├── graphlib_rust               # 图数据结构
+    ├── mermaid-to-svg              # Mermaid 转 SVG
+    └── ordered_hashmap             # 有序 HashMap
+```
+
+---
+
+### 核心模块
 
 | 模块 | Crate | 职责 |
 |------|-------|------|
@@ -85,6 +181,26 @@
 | **Sandbox** | `xai-grok-sandbox` | 进程隔离、安全执行 |
 | **MCP** | `xai-grok-mcp` | Model Context Protocol 支持 |
 | **Hooks** | `xai-grok-hooks` | Agent 生命周期钩子扩展 |
+
+---
+
+### 图示集 (Figures Showcase)
+
+| 编号 | 图表 | 说明 |
+|------|------|------|
+| 01 | ![源码架构](figures/01_source_architecture.png) | 源码整体架构与模块关系 |
+| 02 | ![Agent 构建发现](figures/02_agent_build_discovery.png) | Agent 启动与工具发现流程 |
+| 03 | ![Turn 工具时序](figures/03_turn_tool_sequence.png) | 单轮对话与工具调用时序 |
+| 04 | ![工作区会话生命周期](figures/04_workspace_session_lifecycle.png) | 工作区与会话状态管理 |
+| 05 | ![代码库图谱](figures/05_codebase_graph_lifecycle.png) | 代码库图谱构建与使用 |
+| 06 | ![Checkpoint 回退](figures/06_checkpoint_rewind.png) | 状态Checkpoint与回退机制 |
+| 07 | ![Compaction 压缩](figures/07_compaction_full_replace.png) | 上下文压缩替换策略 |
+| 08 | ![混合记忆搜索](figures/08_memory_hybrid_search.png) | 混合记忆与向量搜索 |
+| 09 | ![Hooks 策略管道](figures/09_hooks_policy_pipeline.png) | Hooks 策略执行管道 |
+| 10 | ![沙箱执行](figures/10_sandbox_enforcement.png) | 沙箱权限强制执行 |
+| 11 | ![崩溃处理](figures/11_crash_handler_lifecycle.png) | 崩溃捕获与恢复生命周期 |
+| 12 | ![后台任务调度](figures/12_background_tasks_scheduler.png) | 后台任务调度器 |
+| 13 | ![插件信任市场](figures/13_plugin_trust_marketplace.png) | 插件市场与信任模型 |
 
 ---
 
@@ -102,91 +218,42 @@
 
 ---
 
-### 文档目录
-
-```
-docs/
-├── 01-architecture/          # 总体架构
-│   ├── 1.1-项目概述.md       # 设计目标与技术选型
-│   ├── 1.2-技术栈.md         # 核心依赖详解
-│   ├── 1.3-Crate地图.md      # 模块依赖关系
-│   └── 1.4-运行模式.md       # TUI/Headless/ACP
-├── 02-startup/               # 启动与组件装配
-│   ├── 2.1-入口点.md         # main.rs 分析
-│   ├── 2.2-配置加载.md       # Config 解析
-│   └── 2.3-初始化顺序.md     # 组件装配时序
-├── 03-request-flow/          # 请求调用链
-│   ├── 3.1-输入入口.md       # TTY/文件/Socket
-│   ├── 3.2-Agent处理.md      # 请求路由分发
-│   └── 3.3-响应生成.md       # 流式响应处理
-├── 04-agent-loop/            # Agent Loop
-│   ├── 4.1-Actor模型.md      # ChatStateActor
-│   ├── 4.2-生命周期.md       # Turn/Command 处理
-│   └── 4.3-状态管理.md       # ConversationItem
-├── 05-context-assembly/      # 上下文组装
-│   ├── 5.1-系统提示词.md     # Prompt 模板
-│   ├── 5.2-工具描述.md       # Tool Schema 注入
-│   └── 5.3-Token管理.md      # 上下文窗口控制
-├── 06-tool-system/           # 工具系统
-│   ├── 6.1-工具注册.md       # Tool Trait
-│   ├── 6.2-工具发现.md       # Discovery 机制
-│   ├── 6.3-工具执行.md       # ToolDispatch
-│   └── 6.4-结果处理.md       # 响应格式化
-├── 07-workspace/             # 工作区
-│   ├── 7.1-文件操作.md       # FS 操作
-│   ├── 7.2-Git集成.md        # gix 封装
-│   ├── 7.3-权限模型.md       # Trust/Capability
-│   └── 7.4-Checkpoint.md     # 快照机制
-├── 08-session-memory/        # 会话与记忆
-│   ├── 8.1-Session.md        # 会话生命周期
-│   ├── 8.2-Compaction.md     # 上下文压缩
-│   └── 8.3-持久化.md         # Journal/SQLite
-├── 09-permissions/           # 权限与安全
-│   ├── 9.1-Sandbox.md        # 进程隔离
-│   ├── 9.2-文件访问.md       # 路径限制
-│   └── 9.3-命令执行.md       # 白名单机制
-└── 10-extensions/            # 扩展机制
-    ├── 10.1-MCP.md           # Model Context Protocol
-    ├── 10.2-Hooks.md         # 生命周期钩子
-    └── 10.3-Skills.md        # 技能系统
-```
-
----
-
 ### 学习路径
 
 #### 入门路径（推荐阅读顺序）
 
 ```
-1. 01-architecture     → 建立整体印象
+1. 源码架构 (01)     → 建立整体印象
       ↓
-2. 02-startup          → 理解启动流程
+2. Agent 构建 (02)   → 理解启动流程
       ↓
-3. 03-request-flow     → 追踪请求全貌
+3. Turn 时序 (03)    → 追踪请求全貌
       ↓
-4. 04-agent-loop       → 掌握核心机制 ⭐
+4. 工作区 (04)       → 掌握核心机制 ⭐
       ↓
-5. 05-context-assembly → 理解上下文
+5. 代码库图谱 (05)   → 理解上下文
       ↓
-6. 06-tool-system      → 工具执行原理
+6. Checkpoint (06)   → 状态管理
       ↓
-7. 07-workspace        → 工作区管理
+7. Compaction (07)   → 上下文压缩
       ↓
-8. 08-session-memory   → 状态持久化
+8. 混合记忆 (08)     → 记忆系统
       ↓
-9. 09-permissions      → 安全机制
+9. Hooks 管道 (09)   → 扩展机制
       ↓
-10. 10-extensions      → 扩展生态
+10. 沙箱执行 (10)    → 安全机制
 ```
 
 #### 专题路径
 
-| 专题 | 关联文档 |
+| 专题 | 关联图表 |
 |------|----------|
-| **Actor 并发模型** | 04-agent-loop, 08-session-memory |
-| **工具系统设计** | 06-tool-system, 10-extensions |
-| **安全沙箱** | 09-permissions, 07-workspace |
-| **上下文压缩** | 08-session-memory, 05-context-assembly |
+| **Actor 并发模型** | 02, 03, 04 |
+| **工具系统设计** | 02, 03, 09 |
+| **安全沙箱** | 10, 04 |
+| **上下文压缩** | 06, 07, 05 |
+| **崩溃恢复** | 11, 12 |
+| **插件生态** | 09, 13 |
 
 ---
 
@@ -197,7 +264,7 @@ docs/
 | **上游仓库** | https://github.com/xai-org/grok-build |
 | **当前版本** | `7cfcb20d2b50b0d18801a6c0af2e401c0e060894` |
 | **分析日期** | 2026-07-19 |
-| **Crate 数量** | 87+ |
+| **Crate 数量** | 83 |
 | **源码规模** | ~500K LOC |
 
 > 本项目为**个人学习笔记**，不代表 Grok Build 官方立场。源码更新后，旧文档可能不再反映最新实现。
@@ -269,9 +336,7 @@ Grok Build 源码基于 Apache-2.0 许可证。
 
 <p align="center">
   <i>Built with for the Rust community</i><br>
-  <a href="https://github.com/nudt-eddie/learn-grok-build">GitHub</a> •
-  <a href="docs/">Documentation</a> •
-  <a href="PROGRESS.md">Progress</a>
+  <a href="https://github.com/nudt-eddie/learn-grok-build">GitHub</a>
 </p>
 
 ---
@@ -333,7 +398,103 @@ This project provides a systematic analysis of [Grok Build](https://github.com/x
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Core Modules
+---
+
+### Module Hierarchy
+
+```
+grok-build/
+├── build/                          # Build tools
+│   └── xai-proto-build             # Protobuf code generation
+│
+├── codegen/                        # Core code generation & runtime
+│   ├── xai-acp-lib                 # ACP Protocol Library
+│   ├── xai-agent-lifecycle         # Agent lifecycle management
+│   ├── xai-chat-state              # Chat state machine (Actor model)
+│   │   ├── actor/                  # Actor impl (mod, mutations, queries, state)
+│   │   ├── compaction_*.rs         # Context compaction
+│   │   ├── persistence.rs          # Persistence (Journal/SQLite)
+│   │   └── types.rs                # Type definitions
+│   ├── xai-codebase-graph          # Codebase graph construction
+│   ├── xai-crash-handler           # Crash handling & recovery
+│   ├── xai-fast-worktree           # Git worktree fast switching
+│   ├── xai-file-utils              # File operation utilities
+│   ├── xai-fsnotify                # Filesystem monitoring
+│   ├── xai-gix-status              # Git status wrapper (gix-based)
+│   ├── xai-grok-agent              # Agent Loop main implementation
+│   ├── xai-grok-announcements      # Announcement system
+│   ├── xai-grok-auth               # Authentication & authorization
+│   ├── xai-grok-config             # Configuration management
+│   ├── xai-grok-config-types       # Config type definitions
+│   ├── xai-grok-env                # Environment variable management
+│   ├── xai-grok-hooks              # Lifecycle hook extensions
+│   ├── xai-grok-http               # HTTP client/server
+│   ├── xai-grok-markdown           # Markdown rendering
+│   ├── xai-grok-markdown-core      # Markdown core parser
+│   ├── xai-grok-mcp                # Model Context Protocol support
+│   ├── xai-grok-memory             # Hybrid memory system
+│   ├── xai-grok-mermaid            # Mermaid diagram generation
+│   ├── xai-grok-models             # Model interface wrapper
+│   ├── xai-grok-pager              # Pager (TUI rendering)
+│   ├── xai-grok-pager-pty-harness  # PTY pager harness
+│   ├── xai-grok-paths              # Path utilities
+│   ├── xai-grok-plugin-marketplace # Plugin marketplace
+│   ├── xai-grok-sampler            # Sampler
+│   ├── xai-grok-sampling-types     # Sampling types
+│   ├── xai-grok-sandbox            # Process isolation sandbox
+│   ├── xai-grok-secrets            # Secret management
+│   ├── xai-grok-shared             # Shared utilities
+│   ├── xai-grok-shell              # Shell interaction
+│   ├── xai-grok-shell-base         # Shell base
+│   ├── xai-grok-shell-session-support # Shell session support
+│   ├── xai-grok-subagent-resolution # Subagent resolution
+│   ├── xai-grok-telemetry          # Telemetry
+│   ├── xai-grok-test-support       # Test support
+│   ├── xai-grok-tools              # Tool system (register/discover/execute)
+│   ├── xai-grok-tools-api          # Tool API
+│   ├── xai-grok-update             # Update checker
+│   ├── xai-grok-version            # Version management
+│   ├── xai-grok-voice              # Voice support
+│   ├── xai-grok-workspace          # Workspace management (file/Git/permission)
+│   ├── xai-grok-workspace-client   # Workspace client
+│   ├── xai-grok-workspace-types    # Workspace type definitions
+│   ├── xai-hooks-plugins-types     # Hook/Plugin types
+│   ├── xai-hunk-tracker            # Hunk tracking (diff)
+│   ├── xai-mixpanel                # Mixpanel integration
+│   ├── xai-prompt-queue            # Prompt queue
+│   ├── xai-ratatui-inline          # Inline TUI components
+│   ├── xai-ratatui-textarea        # TUI textarea
+│   ├── xai-sqlite-journal          # SQLite journal
+│   ├── xai-system-power            # System power management
+│   ├── xai-token-estimation        # Token estimation
+│   ├── xai-tracing-macros          # Tracing macros
+│   ├── xai-tty-utils               # TTY utilities
+│   ├── ptyctl                      # PTY control library
+│   └── ptyctl-cli                  # PTY control CLI
+│
+├── common/                         # Common components
+│   ├── xai-circuit-breaker         # Circuit breaker
+│   ├── xai-computer-hub-core       # Computer Hub core
+│   ├── xai-computer-hub-mcp-adapter # MCP adapter
+│   ├── xai-computer-hub-sdk        # SDK
+│   ├── xai-grok-compaction          # Compaction core logic
+│   ├── xai-interjection-core       # Interjection core
+│   ├── xai-test-utils              # Test utilities
+│   ├── xai-tool-protocol           # Tool protocol
+│   ├── xai-tool-runtime            # Tool runtime
+│   ├── xai-tool-types              # Tool type definitions
+│   └── xai-tracing                 # Tracing infrastructure
+│
+└── third_party/                    # Third-party libraries
+    ├── dagre_rust                  # Graph layout algorithm
+    ├── graphlib_rust               # Graph data structure
+    ├── mermaid-to-svg              # Mermaid to SVG
+    └── ordered_hashmap             # Ordered HashMap
+```
+
+---
+
+### Core Modules
 
 | Module | Crate | Responsibility |
 |--------|-------|----------------|
@@ -345,6 +506,26 @@ This project provides a systematic analysis of [Grok Build](https://github.com/x
 | **Sandbox** | `xai-grok-sandbox` | Process isolation, secure execution |
 | **MCP** | `xai-grok-mcp` | Model Context Protocol support |
 | **Hooks** | `xai-grok-hooks` | Agent lifecycle hook extensions |
+
+---
+
+### Figures Showcase
+
+| # | Figure | Description |
+|---|--------|-------------|
+| 01 | ![Source Architecture](figures/01_source_architecture.png) | Source code architecture and module relationships |
+| 02 | ![Agent Build Discovery](figures/02_agent_build_discovery.png) | Agent startup and tool discovery flow |
+| 03 | ![Turn Tool Sequence](figures/03_turn_tool_sequence.png) | Single-turn dialogue and tool invocation sequence |
+| 04 | ![Workspace Session](figures/04_workspace_session_lifecycle.png) | Workspace and session state management |
+| 05 | ![Codebase Graph](figures/05_codebase_graph_lifecycle.png) | Codebase graph construction and usage |
+| 06 | ![Checkpoint Rewind](figures/06_checkpoint_rewind.png) | State checkpoint and rewind mechanism |
+| 07 | ![Compaction Replace](figures/07_compaction_full_replace.png) | Context compression replacement strategy |
+| 08 | ![Hybrid Memory](figures/08_memory_hybrid_search.png) | Hybrid memory and vector search |
+| 09 | ![Hooks Pipeline](figures/09_hooks_policy_pipeline.png) | Hooks policy execution pipeline |
+| 10 | ![Sandbox](figures/10_sandbox_enforcement.png) | Sandbox permission enforcement |
+| 11 | ![Crash Handler](figures/11_crash_handler_lifecycle.png) | Crash capture and recovery lifecycle |
+| 12 | ![Background Tasks](figures/12_background_tasks_scheduler.png) | Background task scheduler |
+| 13 | ![Plugin Trust](figures/13_plugin_trust_marketplace.png) | Plugin marketplace and trust model |
 
 ---
 
@@ -362,91 +543,42 @@ This project provides a systematic analysis of [Grok Build](https://github.com/x
 
 ---
 
-### Documentation Structure
-
-```
-docs/
-├── 01-architecture/          # Overall architecture
-│   ├── 1.1-项目概述.md       # Design goals and tech choices
-│   ├── 1.2-技术栈.md         # Core dependencies explained
-│   ├── 1.3-Crate地图.md      # Module dependencies
-│   └── 1.4-运行模式.md       # TUI/Headless/ACP modes
-├── 02-startup/               # Startup and component assembly
-│   ├── 2.1-入口点.md         # main.rs analysis
-│   ├── 2.2-配置加载.md       # Config parsing
-│   └── 2.3-初始化顺序.md     # Component assembly sequence
-├── 03-request-flow/          # Request call chain
-│   ├── 3.1-输入入口.md       # TTY/File/Socket input
-│   ├── 3.2-Agent处理.md      # Request routing
-│   └── 3.3-响应生成.md       # Streaming response handling
-├── 04-agent-loop/            # Agent Loop
-│   ├── 4.1-Actor模型.md      # ChatStateActor
-│   ├── 4.2-生命周期.md       # Turn/Command processing
-│   └── 4.3-状态管理.md       # ConversationItem
-├── 05-context-assembly/      # Context assembly
-│   ├── 5.1-系统提示词.md     # Prompt templates
-│   ├── 5.2-工具描述.md       # Tool Schema injection
-│   └── 5.3-Token管理.md      # Context window control
-├── 06-tool-system/           # Tool system
-│   ├── 6.1-工具注册.md       # Tool Trait
-│   ├── 6.2-工具发现.md       # Discovery mechanism
-│   ├── 6.3-工具执行.md       # ToolDispatch
-│   └── 6.4-结果处理.md       # Response formatting
-├── 07-workspace/             # Workspace
-│   ├── 7.1-文件操作.md       # FS operations
-│   ├── 7.2-Git集成.md        # gix wrapper
-│   ├── 7.3-权限模型.md       # Trust/Capability
-│   └── 7.4-Checkpoint.md     # Snapshot mechanism
-├── 08-session-memory/        # Session and memory
-│   ├── 8.1-Session.md        # Session lifecycle
-│   ├── 8.2-Compaction.md     # Context compression
-│   └── 8.3-持久化.md         # Journal/SQLite
-├── 09-permissions/           # Permissions and security
-│   ├── 9.1-Sandbox.md        # Process isolation
-│   ├── 9.2-文件访问.md       # Path restrictions
-│   └── 9.3-命令执行.md       # Whitelist mechanism
-└── 10-extensions/            # Extension mechanisms
-    ├── 10.1-MCP.md           # Model Context Protocol
-    ├── 10.2-Hooks.md         # Lifecycle hooks
-    └── 10.3-Skills.md        # Skills system
-```
-
----
-
 ### Learning Path
 
 #### Beginner Path (Recommended Reading Order)
 
 ```
-1. 01-architecture     → Build overall understanding
+1. Source Architecture (01)   → Build overall understanding
       ↓
-2. 02-startup          → Understand startup process
+2. Agent Build (02)           → Understand startup process
       ↓
-3. 03-request-flow     → Trace request flow
+3. Turn Sequence (03)         → Trace request flow
       ↓
-4. 04-agent-loop       → Master core mechanism ⭐
+4. Workspace (04)             → Master core mechanism ⭐
       ↓
-5. 05-context-assembly → Understand context
+5. Codebase Graph (05)        → Understand context
       ↓
-6. 06-tool-system      → Tool execution principles
+6. Checkpoint (06)            → State management
       ↓
-7. 07-workspace        → Workspace management
+7. Compaction (07)            → Context compression
       ↓
-8. 08-session-memory   → State persistence
+8. Hybrid Memory (08)         → Memory system
       ↓
-9. 09-permissions      → Security mechanisms
+9. Hooks Pipeline (09)        → Extension mechanism
       ↓
-10. 10-extensions      → Extension ecosystem
+10. Sandbox (10)              → Security mechanism
 ```
 
 #### Topic-Based Path
 
-| Topic | Related Documents |
-|-------|-------------------|
-| **Actor Concurrency Model** | 04-agent-loop, 08-session-memory |
-| **Tool System Design** | 06-tool-system, 10-extensions |
-| **Security Sandbox** | 09-permissions, 07-workspace |
-| **Context Compression** | 08-session-memory, 05-context-assembly |
+| Topic | Related Figures |
+|-------|-----------------|
+| **Actor Concurrency Model** | 02, 03, 04 |
+| **Tool System Design** | 02, 03, 09 |
+| **Security Sandbox** | 10, 04 |
+| **Context Compression** | 06, 07, 05 |
+| **Crash Recovery** | 11, 12 |
+| **Plugin Ecosystem** | 09, 13 |
 
 ---
 
@@ -457,7 +589,7 @@ docs/
 | **Upstream Repository** | https://github.com/xai-org/grok-build |
 | **Current Version** | `7cfcb20d2b50b0d18801a6c0af2e401c0e060894` |
 | **Analysis Date** | 2026-07-19 |
-| **Crate Count** | 87+ |
+| **Crate Count** | 83 |
 | **Code Scale** | ~500K LOC |
 
 > This project is a **personal study note** and does not represent the official position of Grok Build. After source code updates, old documentation may no longer reflect the latest implementation.
@@ -529,7 +661,5 @@ Grok Build source code is licensed under Apache-2.0.
 
 <p align="center">
   <i>Built with for the Rust community</i><br>
-  <a href="https://github.com/nudt-eddie/learn-grok-build">GitHub</a> •
-  <a href="docs/">Documentation</a> •
-  <a href="PROGRESS.md">Progress</a>
+  <a href="https://github.com/nudt-eddie/learn-grok-build">GitHub</a>
 </p>
