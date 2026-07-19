@@ -1,6 +1,6 @@
 # Agent Loop Documentation
 
-<!-- SOURCE: https://github.com/xxx/xai-chat-state/src/actor/mod.rs (xai-chat-state crate) -->
+<!-- SOURCE: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs (xai-chat-state crate) -->
 <!-- EVIDENCE: SOURCE = direct code reference; OBSERVED = pattern seen in implementation; INFERENCE = derived conclusion -->
 <!-- PERMALINK-FORMAT: https://github.com/{org}/{repo}/blob/{branch}/source/crates/codegen/xai-chat-state/src/{file}#{line} -->
 
@@ -10,19 +10,19 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 
 **Key Conclusion**: The actor pattern eliminates lock contention entirely since all state mutations are sequential.
 > EVIDENCE: `run()` method in `actor/mod.rs` processes all commands within a single tokio task. No `Mutex` or `RwLock` types appear in the state definition (`state.rs`).
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L50-L80
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L50-L80
 
 ### Why Actor-Based Design?
 
-<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 -->
+<!-- SOURCE: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 -->
 
 1. **Thread safety without locks**: All state mutations occur within a single tokio task, eliminating race conditions
    > EVIDENCE: `ChatStateActor::run()` consumes `cmd_rx` in a loop; `ChatState` struct has no synchronization primitives.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
 
 2. **Simple reasoning**: State changes are linear and predictable - no concurrent modification edge cases
    > EVIDENCE: `handle_command()` dispatches to synchronous handlers; no interleaving of mutation logic.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L200
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L200
 
 3. **Natural backpressure**: The actor naturally serializes work; slow handlers backpressure senders
    > EVIDENCE: `mpsc::UnboundedSender::send()` is async-yielding; fast senders block only when the channel buffer fills.
@@ -54,24 +54,24 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 
 ### Key Design Principles
 
-<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 -->
-<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L1-L200 -->
+<!-- SOURCE: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 -->
+<!-- SOURCE: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L1-L200 -->
 
 1. **Actor-based concurrency**: All state mutations happen sequentially inside the actor task
    > EVIDENCE: `handle.rs` fire-and-forget mutations; `actor/mod.rs` sequential command processing.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L150
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L150
 
 2. **Host-agnostic lifecycle hooks**: Contributors receive data-only inputs; loop control stays with the host
    > EVIDENCE: `TurnStartInput` struct in `xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs` contains only owned data.
-   > PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 3. **Capability injection at install time**: Contributors act through capabilities injected at spawn, never owning loop control
    > EVIDENCE: `ChatStateHandle` is cloned into contributors at actor spawn; contributors hold no `Arc<Actor>`.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
 
 4. **Fire-and-forget + oneshot pattern**: Mutations are fire-and-forget; queries return via oneshot channel
    > EVIDENCE: `handle.rs` `push_user_message()` uses `send()` without awaiting; `get_conversation()` uses `oneshot::channel()`.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L120
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L120
 
 ---
 
@@ -83,7 +83,7 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 <!-- EVIDENCE: Fire-and-forget pattern optimizes throughput over response confirmation -->
 > CONCLUSION: The fire-and-forget pattern for mutations is an intentional tradeoff optimizing for throughput over response confirmation.
 > EVIDENCE: `handle.rs` `push_user_message()` calls `self.cmd_tx.send()` and discards the result; no await.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L80
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L80
 
 ```
 ┌──────────┐     ┌─────────────────┐     ┌──────────────────┐     ┌────────────┐
@@ -110,7 +110,7 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 <!-- OBSERVED: Query pattern uses oneshot::channel() for request/response -->
 > CONCLUSION: Queries return `Option<T>` to handle actor death gracefully without panicking the caller.
 > EVIDENCE: `handle.rs` `query()` method returns `Option<T>` and logs error on actor death.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L200-L250
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L200-L250
 ```
 ┌──────────┐     ┌─────────────────┐     ┌──────────────────┐
 │ Session  │     │ ChatStateHandle │     │ ChatStateActor   │
@@ -133,7 +133,7 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 <!-- OBSERVED: Events are one-way notifications via mpsc::UnboundedSender -->
 > CONCLUSION: Unbounded channel chosen to avoid blocking actor on slow subscribers; dropped events are acceptable.
 > EVIDENCE: `event_tx` is `mpsc::UnboundedSender<ChatStateEvent>`; `send()` returns `Result<(), UnboundedError>` and error is logged, not propagated.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/events.rs#L1-L50
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/events.rs#L1-L50
 ```
 ┌──────────────────┐     ┌──────────────┐     ┌────────────┐
 │ ChatStateActor   │     │  event_tx    │     │  Session   │
@@ -159,7 +159,7 @@ The `ChatStateActor` manages several state machines that transition based on com
 <!-- OBSERVED: States tracked in actor/mod.rs conversation_state() method -->
 > CONCLUSION: Tool calls create a sub-state because they require multi-round coordination between assistant and tool results.
 > EVIDENCE: `ChatState::conversation_state()` returns variant based on last item role; `TOOL_PHASE` persists until `last_tool_result()`.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L100-L150
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/state.rs#L100-L150
 
 ```
                          ┌─────────────────────────────┐
@@ -213,7 +213,7 @@ The `ChatStateActor` manages several state machines that transition based on com
 <!-- OBSERVED: Defined in types.rs TurnCaptureState enum -->
 > CONCLUSION: Offset-based capture avoids copying until `take()` is called, minimizing memory overhead during active capture.
 > EVIDENCE: `TurnCaptureState` stores `turn_start_offset: usize` not `messages: Vec<ConversationItem>`.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/types.rs#L50-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/types.rs#L50-L100
 
 ```
                     ┌──────────────────────┐
@@ -265,7 +265,7 @@ The `ChatStateActor` manages several state machines that transition based on com
 <!-- OBSERVED: Token state managed in usage.rs -->
 > CONCLUSION: Streaming tokens accumulate incrementally; `STANDBY_AGAIN` handles multiple streaming turns without state machine reset overhead.
 > EVIDENCE: `StreamingState` enum in `usage.rs` has `STANDBY_AGAIN` variant; transitions back to STANDBY on stream end.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/usage.rs#L1-L50
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/usage.rs#L1-L50
 
 ```
 ┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -293,7 +293,7 @@ The `ChatStateActor` manages several state machines that transition based on com
 <!-- OBSERVED: Compaction logic in compaction_*.rs files -->
 > CONCLUSION: Two-phase handling (active vs inactive capture) preserves turn data integrity during compaction.
 > EVIDENCE: `replace_conversation_for_compaction()` checks `turn_capture.is_some()` and clones tail to `pre_replacement_messages` before truncation.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/compaction_utils.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/compaction_utils.rs#L1-L100
 
 ```
 ┌──────────────────┐
@@ -323,7 +323,7 @@ The `ChatStateActor` manages several state machines that transition based on com
 <!-- OBSERVED: Lifecycle states in xai-agent-lifecycle contributors.rs -->
 > CONCLUSION: `SKIP` state allows contributors to veto turns without blocking the actor or causing errors.
 > EVIDENCE: `TurnLifecycleAction::Skip` variant exists in `TurnLifecycleAction` enum; `turn_start()` returns `Option<TurnLifecycleAction>`.
-> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 ```
 ┌──────────────┐   turn_start()   ┌──────────────┐
@@ -361,23 +361,23 @@ The `ChatStateActor` manages several state machines that transition based on com
 
 ## Key Design Principles
 
-<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 (reiterated) -->
+<!-- SOURCE: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 (reiterated) -->
 
 1. **Actor-based concurrency**: All state mutations happen sequentially inside the actor task
    > EVIDENCE: `handle_command()` dispatches to synchronous handlers; no interleaving of mutation logic.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L150
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L150
 
 2. **Host-agnostic lifecycle hooks**: Contributors receive data-only inputs; loop control stays with the host
    > EVIDENCE: `TurnStartInput` contains only owned data, no references to actor internals.
-   > PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 3. **Capability injection at install time**: Contributors act through capabilities injected at spawn, never owning loop control
    > EVIDENCE: Contributors receive `ChatStateHandle` clone at spawn; actor control flow never delegates to contributors.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
 
 4. **Fire-and-forget + oneshot pattern**: Mutations are fire-and-forget; queries return via oneshot channel
    > EVIDENCE: `handle.rs` `push_user_message()` discards `send()` result; `get_conversation()` awaits `rx`.
-   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L120
+   > PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L120
 
 ---
 
@@ -388,7 +388,7 @@ The `ChatStateActor` manages several state machines that transition based on com
 <!-- OBSERVED: From actor/state.rs ChatState struct definition -->
 > CONCLUSION: All fields are `pub(crate)` to allow actor module direct access without getters, reducing abstraction overhead.
 > EVIDENCE: `state.rs` defines `pub(crate) struct ChatState` with direct field access from `actor/mod.rs`.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
 
 ```rust
 pub(crate) struct ChatState {
@@ -449,7 +449,7 @@ pub struct ChatStateConfig {
 <!-- OBSERVED: From handle.rs ChatStateSnapshot struct -->
 > CONCLUSION: Snapshot excludes internal-only fields like `turn_capture` for clean serialization.
 > EVIDENCE: `ChatStateSnapshot` struct omits `turn_capture`, `harness_trace_buffer`, `harness_trace_turns` fields present in `ChatState`.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L150
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L150
 
 ```rust
 pub struct ChatStateSnapshot {
@@ -472,7 +472,7 @@ pub struct ChatStateSnapshot {
 <!-- OBSERVED: From events.rs ChatStateEvent enum -->
 > CONCLUSION: Events carry data needed by subscribers without exposing internal state, preventing coupling between actor and listeners.
 > EVIDENCE: `ChatStateEvent` variants (`TokensUpdated`, `ConversationReset`) contain only data values, no references to actor internals.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/events.rs#L1-L50
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/events.rs#L1-L50
 
 ```rust
 pub enum ChatStateEvent {
@@ -507,7 +507,7 @@ pub enum ChatStateEvent {
 
 > CONCLUSION: Fire-and-forget is chosen for mutations because the sender does not need confirmation; failures are logged but not blocking.
 > EVIDENCE: `push_user_message()` signature returns `()` not `Result`; `send()` result is discarded with `let _ =`.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L80
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L80
 
 ```rust
 // Push messages into conversation
@@ -541,7 +541,7 @@ pub fn repair_dangling_after_harness_halt(&self, class: &'static str)
 <!-- OBSERVED: Query methods are async and return Option<T> -->
 > CONCLUSION: `Option` return handles actor death gracefully without panicking the caller.
 > EVIDENCE: `query()` method in `handle.rs` returns `Option<T>` and logs error when `rx.await` fails.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L200-L250
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L200-L250
 
 ```rust
 // Build request from current state
@@ -578,7 +578,7 @@ pub async fn get_conversation_counts(&self) -> ConversationCounts
 <!-- OBSERVED: From commands.rs ChatStateCommand enum -->
 > CONCLUSION: Command enum pattern matches Rust idioms for type-safe message passing without runtime type checks.
 > EVIDENCE: `ChatStateCommand` is a plain enum with exhaustive matching in `handle_command()`; no trait objects.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/commands.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/commands.rs#L1-L100
 
 Commands are categorized into **Mutations** (fire-and-forget) and **Queries** (request/response via oneshot).
 
@@ -652,7 +652,7 @@ Commands are categorized into **Mutations** (fire-and-forget) and **Queries** (r
 <!-- OBSERVED: From actor/mod.rs spawn() function -->
 > CONCLUSION: Returns handle rather than join handle to allow actor lifetime to be decoupled from spawner.
 > EVIDENCE: `spawn()` returns `ChatStateHandle` not `JoinHandle`; actor runs until `CancellationToken` cancelled or all handles dropped.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
 
 ```rust
 pub fn spawn(
@@ -673,7 +673,7 @@ pub fn spawn(
 <!-- OBSERVED: From actor/mod.rs run() method -->
 > CONCLUSION: `CancellationToken` checked first with `biased;` to enable clean shutdown without waiting for commands.
 > EVIDENCE: `tokio::select! { biased; _ = self.cancellation_token.cancelled() =>` appears before `cmd = self.cmd_rx.recv()`.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L50-L80
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L50-L80
 
 ```rust
 async fn run(mut self) {
@@ -701,7 +701,7 @@ async fn run(mut self) {
 <!-- OBSERVED: From types.rs TurnCapture and handle.rs turn capture methods -->
 > CONCLUSION: Offset-based capture minimizes memory copies until data is actually needed.
 > EVIDENCE: `take_turn_messages()` slices `conversation[turn_start_offset..]` rather than cloning on each push.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/queries.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/queries.rs#L1-L100
 
 ```
 Session                          ChatStateActor
@@ -727,7 +727,7 @@ Session                          ChatStateActor
 <!-- OBSERVED: From compaction_*.rs ReplaceConversation implementation -->
 > CONCLUSION: Pre-replacement messages captured before truncation preserves turn history integrity for active captures.
 > EVIDENCE: `replace_conversation_for_compaction()` clones tail from `turn_start_offset` to `pre_replacement_messages` before truncating.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/compaction_utils.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/compaction_utils.rs#L1-L100
 
 ```
 replace_conversation_for_compaction(items)
@@ -747,10 +747,10 @@ replace_conversation_for_compaction(items)
 
 ## Lifecycle Contributors
 
-<!-- SOURCE: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors.rs -->
+<!-- SOURCE: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors.rs -->
 > CONCLUSION: Data-only inputs ensure contributors cannot corrupt actor state by design.
 > EVIDENCE: `TurnStartInput` struct contains only owned types (`String`, `Vec<ToolDef>`, etc.); no `&mut ChatState` references.
-> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 The agent lifecycle system provides hook points for extensions.
 
@@ -758,7 +758,7 @@ The agent lifecycle system provides hook points for extensions.
 
 > CONCLUSION: Return type `Option<TurnLifecycleAction>` allows contributors to modify control flow without errors.
 > EVIDENCE: `on_turn_start()` returns `Option<TurnLifecycleAction>`; `None` means continue, `Some(action)` means perform specified action.
-> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 ```rust
 pub trait TurnLifecycleContributor: Send + Sync {
@@ -773,7 +773,7 @@ pub trait TurnLifecycleContributor: Send + Sync {
 
 > CONCLUSION: Used for adding dynamic context or modifying prompts per-turn without actor modification.
 > EVIDENCE: `TurnInputFragment` is merged into turn input before model call in `request_builder.rs`.
-> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_input.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_input.rs#L1-L100
 
 ```rust
 pub trait TurnInputContributor: Send + Sync {
@@ -785,7 +785,7 @@ pub trait TurnInputContributor: Send + Sync {
 
 > CONCLUSION: Session-level hooks enable cleanup or global state updates without coupling to turn logic.
 > EVIDENCE: `on_session_idle()` called when session has no active turns; no return value means async/non-blocking.
-> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/session_lifecycle.rs#L1-L50
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/session_lifecycle.rs#L1-L50
 
 ```rust
 pub trait SessionLifecycleContributor: Send + Sync {
@@ -811,7 +811,7 @@ pub trait CommandContributor: Send + Sync {
 <!-- OBSERVED: From conversation_util.rs and compaction related modules -->
 > CONCLUSION: Byte/4 approximation is faster than exact counting at the cost of approximately 10% accuracy.
 > EVIDENCE: `BYTES_PER_TOKEN = 4` constant used in `estimate_item_tokens()`; exact tokenizers not called for estimation.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/conversation_util.rs#L1-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/conversation_util.rs#L1-L100
 
 The system uses byte/4 estimation for token counting:
 
@@ -862,7 +862,7 @@ impl xai_grok_compaction::ItemTokenCounter<ConversationItem>
 <!-- OBSERVED: From persistence.rs ChatPersistence trait -->
 > CONCLUSION: Enables session resumption after restart; critical for long-running agent sessions.
 > EVIDENCE: `ChatStateSnapshot` struct is serializable; `load()` restores state on actor spawn.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/persistence.rs#L1-L50
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/persistence.rs#L1-L50
 
 ```rust
 pub trait ChatPersistence: Send {
@@ -891,7 +891,7 @@ Implementations:
 
 > CONCLUSION: Best choice for mutable shared state in async Rust due to zero synchronization overhead.
 > EVIDENCE: `ChatState` struct has zero `Mutex`, `RwLock`, or `Atomic*` fields; all mutations serialized by actor loop.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
 
 - All mutable state lives in a single tokio task
 - Commands dispatched via `mpsc::UnboundedSender`
@@ -902,7 +902,7 @@ Implementations:
 <!-- OBSERVED: From handle.rs mutation and query methods -->
 > CONCLUSION: Distinction based on whether sender needs confirmation; mutations optimize for throughput, queries for data.
 > EVIDENCE: `push_user_message()` discards `send()` result; `get_conversation()` awaits `rx` to receive data.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L150
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L150
 
 ```rust
 // Mutation - fire and forget
@@ -932,7 +932,7 @@ async fn query<T>(&self, cmd_name: &str, make_cmd: impl FnOnce(oneshot::Sender<T
 <!-- OBSERVED: From types.rs TurnCaptureState -->
 > CONCLUSION: Records position vs copying items is much more efficient; only one allocation at take time.
 > EVIDENCE: `TurnCaptureState` stores `turn_start_offset: usize`; `take_turn_messages()` does single Vec allocation via slice.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/types.rs#L50-L100
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/types.rs#L50-L100
 
 Instead of cloning items on push, record the conversation length at capture start. At take time, slice the new conversation.
 
@@ -949,7 +949,7 @@ let messages = conversation[turn_start_offset..].to_vec();
 <!-- OBSERVED: Contributors receive TurnStartInput with data only -->
 > CONCLUSION: Prevents extensions from bypassing host control by never exposing mutable access to actor internals.
 > EVIDENCE: Contributors receive `ChatStateHandle` (immutable reference semantics) rather than `&mut ChatStateActor`.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
 
 Contributors receive data-only inputs; anything they act through is a capability injected at install time.
 
@@ -958,7 +958,7 @@ Contributors receive data-only inputs; anything they act through is a capability
 <!-- OBSERVED: ReplaceSystemHead uses actor mutex for atomicity -->
 > CONCLUSION: Actor context provides natural serialization for system prompt updates, preventing race conditions with concurrent turns.
 > EVIDENCE: `ReplaceSystemHead` command executed inside `handle_command()` which runs sequentially; no separate locking needed.
-> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L200
+> PERMALINK: https://github.com/xai-org/grok-build/blob/7cfcb20/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L200
 
 `ReplaceSystemHead` executes inside the actor, serializing with concurrent turn pushes to prevent race conditions.
 

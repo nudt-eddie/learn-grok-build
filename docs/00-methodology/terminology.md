@@ -10,7 +10,7 @@ This document defines the core architectural terms used throughout the Grok Buil
 
 **Definition**
 
-The `run_session` async function in `xai-grok-shell/src/agent/mvp_agent/acp_agent.rs`. This is the top-level event loop that drives a `SessionActor`. It uses `tokio::select!` to multiplex across:
+The `run_session` async function in `source/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs`. This is the top-level event loop that drives a `SessionActor`. It uses `tokio::select!` to multiplex across:
 
 - Idle flush timers (memory persistence)
 - Dream check timers (memory synthesis)
@@ -34,7 +34,7 @@ The orchestration loop is the **dispatch hub** for a session. It does not own an
 
 **Definition**
 
-An alternate name for `ChatStateActor` used in documentation and the crate-level doc comment in `xai-chat-state/src/lib.rs`. It denotes the actor that owns all conversation state (messages, tokens, prompt index, sampling config, pruning settings, credentials).
+An alternate name for `ChatStateActor` used in documentation and the crate-level doc comment in `source/crates/codegen/xai-chat-state/src/lib.rs`. It denotes the actor that owns all conversation state (messages, tokens, prompt index, sampling config, pruning settings, credentials).
 
 The crate-level architecture diagram shows the relationship explicitly:
 
@@ -61,7 +61,7 @@ It provides a sequential, mutation-safe API via `ChatStateCommand` messages and 
 
 **Definition**
 
-The `AgentBuilder` struct in `xai-grok-agent/src/builder.rs`. A fluent builder API that constructs an `Agent` instance from an `AgentDefinition`, session context, tool registry, and various feature flags.
+The `AgentBuilder` struct in `source/crates/codegen/xai-grok-agent/src/builder.rs`. A fluent builder API that constructs an `Agent` instance from an `AgentDefinition`, session context, tool registry, and various feature flags.
 
 Two main construction flows:
 
@@ -102,7 +102,7 @@ Agent Builder is a **one-shot constructor** — it produces an `Agent` and then 
 
 **Definition**
 
-The `AgentDefinition` struct in `xai-grok-agent/src/config.rs`. A parsed representation of an agent's configuration, loaded from `.grok/agents/*.md` files or created programmatically.
+The `AgentDefinition` struct in `source/crates/codegen/xai-grok-agent/src/config.rs`. A parsed representation of an agent's configuration, loaded from `.grok/agents/*.md` files or created programmatically.
 
 An agent definition contains:
 
@@ -159,7 +159,7 @@ It delegates conversation state storage to `ChatStateActor` and tool execution t
 
 **Definition**
 
-The concrete struct `ChatStateActor` in `xai-chat-state/src/actor/mod.rs`. Runs in a dedicated tokio task and owns all chat state (conversation messages, token counts, prompt index, sampling config, pruning config, persistence layer). Processes commands sequentially from an unbounded mpsc channel.
+The concrete struct `ChatStateActor` in `source/crates/codegen/xai-chat-state/src/actor/mod.rs`. Runs in a dedicated tokio task and owns all chat state (conversation messages, token counts, prompt index, sampling config, pruning config, persistence layer). Processes commands sequentially from an unbounded mpsc channel.
 
 **Code Location**
 
@@ -183,7 +183,7 @@ It does NOT:
 - Handle MCP connections
 - Directly emit user-facing events (it emits `ChatStateEvent` which `SessionActor` may transform)
 
-The `ChatStateHandle` type (in `xai-chat-state/src/handle.rs`) is the `Clone + Send` proxy that callers (including `SessionActor`) use to send commands to this actor.
+The `ChatStateHandle` type (in `source/crates/codegen/xai-chat-state/src/handle.rs`) is the `Clone + Send` proxy that callers (including `SessionActor`) use to send commands to this actor.
 
 ---
 
