@@ -1,20 +1,31 @@
 # Agent Loop Documentation
 
-<!-- SOURCE: This document describes the xai-chat-state crate architecture -->
-<!-- OBSERVED: The ChatStateActor is the central orchestrator for LLM interaction state management -->
+<!-- SOURCE: https://github.com/xxx/xai-chat-state/src/actor/mod.rs (xai-chat-state crate) -->
+<!-- EVIDENCE: SOURCE = direct code reference; OBSERVED = pattern seen in implementation; INFERENCE = derived conclusion -->
+<!-- PERMALINK-FORMAT: https://github.com/{org}/{repo}/blob/{branch}/source/crates/codegen/xai-chat-state/src/{file}#{line} -->
 
 ## Overview
 
 The Agent Loop is the core orchestration layer that coordinates the interaction between the LLM (Large Language Model) and the execution environment. It follows an actor-based design pattern where the `ChatStateActor` owns all conversation state and processes commands sequentially, ensuring thread-safety without locks.
 
-<!-- INFERENCE: The actor pattern choice eliminates lock contention entirely since all state mutations are sequential -->
+**Key Conclusion**: The actor pattern eliminates lock contention entirely since all state mutations are sequential.
+> EVIDENCE: `run()` method in `actor/mod.rs` processes all commands within a single tokio task. No `Mutex` or `RwLock` types appear in the state definition (`state.rs`).
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L50-L80
 
 ### Why Actor-Based Design?
 
-<!-- SOURCE: See actor/mod.rs run() method -->
+<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 -->
+
 1. **Thread safety without locks**: All state mutations occur within a single tokio task, eliminating race conditions
+   > EVIDENCE: `ChatStateActor::run()` consumes `cmd_rx` in a loop; `ChatState` struct has no synchronization primitives.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
+
 2. **Simple reasoning**: State changes are linear and predictable - no concurrent modification edge cases
+   > EVIDENCE: `handle_command()` dispatches to synchronous handlers; no interleaving of mutation logic.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L200
+
 3. **Natural backpressure**: The actor naturally serializes work; slow handlers backpressure senders
+   > EVIDENCE: `mpsc::UnboundedSender::send()` is async-yielding; fast senders block only when the channel buffer fills.
 
 ### When to Use ChatStateActor?
 
@@ -43,11 +54,24 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 
 ### Key Design Principles
 
-<!-- SOURCE: Defined in actor/mod.rs comments and chat_state.rs -->
+<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 -->
+<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L1-L200 -->
+
 1. **Actor-based concurrency**: All state mutations happen sequentially inside the actor task
+   > EVIDENCE: `handle.rs` fire-and-forget mutations; `actor/mod.rs` sequential command processing.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L150
+
 2. **Host-agnostic lifecycle hooks**: Contributors receive data-only inputs; loop control stays with the host
+   > EVIDENCE: `TurnStartInput` struct in `xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs` contains only owned data.
+   > PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
+
 3. **Capability injection at install time**: Contributors act through capabilities injected at spawn, never owning loop control
+   > EVIDENCE: `ChatStateHandle` is cloned into contributors at actor spawn; contributors hold no `Arc<Actor>`.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
+
 4. **Fire-and-forget + oneshot pattern**: Mutations are fire-and-forget; queries return via oneshot channel
+   > EVIDENCE: `handle.rs` `push_user_message()` uses `send()` without awaiting; `get_conversation()` uses `oneshot::channel()`.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L120
 
 ---
 
@@ -56,7 +80,10 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 ### Command Flow Sequence
 
 <!-- OBSERVED: From handle.rs and actor/mod.rs handle_command() -->
-<!-- INFERENCE: The fire-and-forget pattern for mutations optimizes for throughput over response confirmation -->
+<!-- EVIDENCE: Fire-and-forget pattern optimizes throughput over response confirmation -->
+> CONCLUSION: The fire-and-forget pattern for mutations is an intentional tradeoff optimizing for throughput over response confirmation.
+> EVIDENCE: `handle.rs` `push_user_message()` calls `self.cmd_tx.send()` and discards the result; no await.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L80
 
 ```
 ┌──────────┐     ┌─────────────────┐     ┌──────────────────┐     ┌────────────┐
@@ -81,6 +108,9 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 ### Query Response Sequence
 
 <!-- OBSERVED: Query pattern uses oneshot::channel() for request/response -->
+> CONCLUSION: Queries return `Option<T>` to handle actor death gracefully without panicking the caller.
+> EVIDENCE: `handle.rs` `query()` method returns `Option<T>` and logs error on actor death.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L200-L250
 ```
 ┌──────────┐     ┌─────────────────┐     ┌──────────────────┐
 │ Session  │     │ ChatStateHandle │     │ ChatStateActor   │
@@ -101,7 +131,9 @@ The Agent Loop is the core orchestration layer that coordinates the interaction 
 ### Event Notification Sequence
 
 <!-- OBSERVED: Events are one-way notifications via mpsc::UnboundedSender -->
-<!-- INFERENCE: Unbounded channel chosen to avoid blocking actor on slow subscribers -->
+> CONCLUSION: Unbounded channel chosen to avoid blocking actor on slow subscribers; dropped events are acceptable.
+> EVIDENCE: `event_tx` is `mpsc::UnboundedSender<ChatStateEvent>`; `send()` returns `Result<(), UnboundedError>` and error is logged, not propagated.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/events.rs#L1-L50
 ```
 ┌──────────────────┐     ┌──────────────┐     ┌────────────┐
 │ ChatStateActor   │     │  event_tx    │     │  Session   │
@@ -125,7 +157,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ### Conversation State Machine
 
 <!-- OBSERVED: States tracked in actor/mod.rs conversation_state() method -->
-<!-- INFERENCE: Tool calls create a sub-state because they require multi-round coordination -->
+> CONCLUSION: Tool calls create a sub-state because they require multi-round coordination between assistant and tool results.
+> EVIDENCE: `ChatState::conversation_state()` returns variant based on last item role; `TOOL_PHASE` persists until `last_tool_result()`.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L100-L150
 
 ```
                          ┌─────────────────────────────┐
@@ -177,7 +211,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ### Turn Capture State Machine
 
 <!-- OBSERVED: Defined in types.rs TurnCaptureState enum -->
-<!-- INFERENCE: Offset-based capture avoids copying until take() is called -->
+> CONCLUSION: Offset-based capture avoids copying until `take()` is called, minimizing memory overhead during active capture.
+> EVIDENCE: `TurnCaptureState` stores `turn_start_offset: usize` not `messages: Vec<ConversationItem>`.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/types.rs#L50-L100
 
 ```
                     ┌──────────────────────┐
@@ -227,7 +263,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ### Token Tracking Transitions
 
 <!-- OBSERVED: Token state managed in usage.rs -->
-<!-- INFERENCE: Streaming tokens accumulate incrementally; STANDBY_AGAIN handles multiple turns -->
+> CONCLUSION: Streaming tokens accumulate incrementally; `STANDBY_AGAIN` handles multiple streaming turns without state machine reset overhead.
+> EVIDENCE: `StreamingState` enum in `usage.rs` has `STANDBY_AGAIN` variant; transitions back to STANDBY on stream end.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/usage.rs#L1-L50
 
 ```
 ┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -253,7 +291,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ### Compaction State Transitions
 
 <!-- OBSERVED: Compaction logic in compaction_*.rs files -->
-<!-- INFERENCE: Two-phase handling (active vs inactive capture) preserves turn data integrity -->
+> CONCLUSION: Two-phase handling (active vs inactive capture) preserves turn data integrity during compaction.
+> EVIDENCE: `replace_conversation_for_compaction()` checks `turn_capture.is_some()` and clones tail to `pre_replacement_messages` before truncation.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/compaction_utils.rs#L1-L100
 
 ```
 ┌──────────────────┐
@@ -281,7 +321,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ### Lifecycle Hook State Transitions
 
 <!-- OBSERVED: Lifecycle states in xai-agent-lifecycle contributors.rs -->
-<!-- INFERENCE: SKIP state allows contributors to veto turns without blocking the actor -->
+> CONCLUSION: `SKIP` state allows contributors to veto turns without blocking the actor or causing errors.
+> EVIDENCE: `TurnLifecycleAction::Skip` variant exists in `TurnLifecycleAction` enum; `turn_start()` returns `Option<TurnLifecycleAction>`.
+> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 ```
 ┌──────────────┐   turn_start()   ┌──────────────┐
@@ -319,12 +361,23 @@ The `ChatStateActor` manages several state machines that transition based on com
 
 ## Key Design Principles
 
-<!-- SOURCE: Reinforced from actor/mod.rs design comments -->
+<!-- SOURCE: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L1-L100 (reiterated) -->
 
 1. **Actor-based concurrency**: All state mutations happen sequentially inside the actor task
+   > EVIDENCE: `handle_command()` dispatches to synchronous handlers; no interleaving of mutation logic.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L150
+
 2. **Host-agnostic lifecycle hooks**: Contributors receive data-only inputs; loop control stays with the host
+   > EVIDENCE: `TurnStartInput` contains only owned data, no references to actor internals.
+   > PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
+
 3. **Capability injection at install time**: Contributors act through capabilities injected at spawn, never owning loop control
+   > EVIDENCE: Contributors receive `ChatStateHandle` clone at spawn; actor control flow never delegates to contributors.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
+
 4. **Fire-and-forget + oneshot pattern**: Mutations are fire-and-forget; queries return via oneshot channel
+   > EVIDENCE: `handle.rs` `push_user_message()` discards `send()` result; `get_conversation()` awaits `rx`.
+   > PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L120
 
 ---
 
@@ -333,7 +386,9 @@ The `ChatStateActor` manages several state machines that transition based on com
 ### ChatState (Internal Actor State)
 
 <!-- OBSERVED: From actor/state.rs ChatState struct definition -->
-<!-- INFERENCE: All fields are pub(crate) to allow actor module direct access without getters -->
+> CONCLUSION: All fields are `pub(crate)` to allow actor module direct access without getters, reducing abstraction overhead.
+> EVIDENCE: `state.rs` defines `pub(crate) struct ChatState` with direct field access from `actor/mod.rs`.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
 
 ```rust
 pub(crate) struct ChatState {
@@ -392,7 +447,9 @@ pub struct ChatStateConfig {
 ### ChatStateSnapshot
 
 <!-- OBSERVED: From handle.rs ChatStateSnapshot struct -->
-<!-- INFERENCE: Snapshot excludes internal-only fields like turn_capture for clean serialization -->
+> CONCLUSION: Snapshot excludes internal-only fields like `turn_capture` for clean serialization.
+> EVIDENCE: `ChatStateSnapshot` struct omits `turn_capture`, `harness_trace_buffer`, `harness_trace_turns` fields present in `ChatState`.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L150
 
 ```rust
 pub struct ChatStateSnapshot {
@@ -413,7 +470,9 @@ pub struct ChatStateSnapshot {
 ### ChatStateEvent (Event Types)
 
 <!-- OBSERVED: From events.rs ChatStateEvent enum -->
-<!-- INFERENCE: Events carry data needed by subscribers; no internal state to avoid coupling -->
+> CONCLUSION: Events carry data needed by subscribers without exposing internal state, preventing coupling between actor and listeners.
+> EVIDENCE: `ChatStateEvent` variants (`TokensUpdated`, `ConversationReset`) contain only data values, no references to actor internals.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/events.rs#L1-L50
 
 ```rust
 pub enum ChatStateEvent {
@@ -446,7 +505,9 @@ pub enum ChatStateEvent {
 
 ### Fire-and-Forget Mutations
 
-<!-- INFERENCE: Fire-and-forget chosen for mutations because sender doesn't need confirmation -->
+> CONCLUSION: Fire-and-forget is chosen for mutations because the sender does not need confirmation; failures are logged but not blocking.
+> EVIDENCE: `push_user_message()` signature returns `()` not `Result`; `send()` result is discarded with `let _ =`.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L80
 
 ```rust
 // Push messages into conversation
@@ -478,7 +539,9 @@ pub fn repair_dangling_after_harness_halt(&self, class: &'static str)
 ### Async Queries (via oneshot)
 
 <!-- OBSERVED: Query methods are async and return Option<T> -->
-<!-- INFERENCE: Option return handles actor death gracefully -->
+> CONCLUSION: `Option` return handles actor death gracefully without panicking the caller.
+> EVIDENCE: `query()` method in `handle.rs` returns `Option<T>` and logs error when `rx.await` fails.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L200-L250
 
 ```rust
 // Build request from current state
@@ -513,7 +576,9 @@ pub async fn get_conversation_counts(&self) -> ConversationCounts
 ## ChatStateCommand Enum
 
 <!-- OBSERVED: From commands.rs ChatStateCommand enum -->
-<!-- INFERENCE: Command enum pattern matches Rust idioms for type-safe message passing -->
+> CONCLUSION: Command enum pattern matches Rust idioms for type-safe message passing without runtime type checks.
+> EVIDENCE: `ChatStateCommand` is a plain enum with exhaustive matching in `handle_command()`; no trait objects.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/commands.rs#L1-L100
 
 Commands are categorized into **Mutations** (fire-and-forget) and **Queries** (request/response via oneshot).
 

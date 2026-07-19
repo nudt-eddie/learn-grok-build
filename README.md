@@ -75,6 +75,23 @@
 
 ---
 
+### 10-Section Structure
+
+| Section | CN | EN | Figures |
+|---------|----|----|---------|
+| 01 总体架构 | [README](docs/01-architecture/README.md) | [en.md](docs/01-architecture/en.md) | 01_source_architecture.png, grok解读.png, 技术架构和协议系统图.png |
+| 02 启动流程 | [README](docs/02-startup/README.md) | [en.md](docs/02-startup/en.md) | 02_agent_build_discovery.png |
+| 03 请求流程 | [README](docs/03-request-flow/README.md) | [en.md](docs/03-request-flow/en.md) | 03_turn_tool_sequence.png |
+| 04 Agent Loop | [README](docs/04-agent-loop/README.md) | [en.md](docs/04-agent-loop/en.md) | - |
+| 05 上下文组装 | [README](docs/05-context-assembly/README.md) | [en.md](docs/05-context-assembly/en.md) | - |
+| 06 工具系统 | [README](docs/06-tool-system/README.md) | [en.md](docs/06-tool-system/en.md) | - |
+| 07 工作区 | [README](docs/07-workspace/README.md) | [en.md](docs/07-workspace/en.md) | 04_workspace_session_lifecycle.png |
+| 08 会话记忆 | [README](docs/08-session-memory/README.md) | [en.md](docs/08-session-memory/en.md) | 06_checkpoint_rewind.png, 07_compaction_full_replace.png, 08_memory_hybrid_search.png |
+| 09 权限安全 | [README](docs/09-permissions/README.md) | [en.md](docs/09-permissions/en.md) | 10_sandbox_enforcement.png |
+| 10 扩展机制 | [README](docs/10-extensions/README.md) | [en.md](docs/10-extensions/en.md) | 09_hooks_policy_pipeline.png |
+
+---
+
 ### 模块层次结构
 
 ```
