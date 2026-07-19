@@ -650,7 +650,9 @@ Commands are categorized into **Mutations** (fire-and-forget) and **Queries** (r
 ### Actor Spawning
 
 <!-- OBSERVED: From actor/mod.rs spawn() function -->
-<!-- INFERENCE: Returns handle rather than join handle to allow actor lifetime decoupled from spawner -->
+> CONCLUSION: Returns handle rather than join handle to allow actor lifetime to be decoupled from spawner.
+> EVIDENCE: `spawn()` returns `ChatStateHandle` not `JoinHandle`; actor runs until `CancellationToken` cancelled or all handles dropped.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
 
 ```rust
 pub fn spawn(
@@ -669,7 +671,9 @@ pub fn spawn(
 ### Main Actor Loop
 
 <!-- OBSERVED: From actor/mod.rs run() method -->
-<!-- INFERENCE: CancellationToken checked first (biased) to enable clean shutdown -->
+> CONCLUSION: `CancellationToken` checked first with `biased;` to enable clean shutdown without waiting for commands.
+> EVIDENCE: `tokio::select! { biased; _ = self.cancellation_token.cancelled() =>` appears before `cmd = self.cmd_rx.recv()`.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L50-L80
 
 ```rust
 async fn run(mut self) {
@@ -695,7 +699,9 @@ async fn run(mut self) {
 ### Turn Message Capture Flow
 
 <!-- OBSERVED: From types.rs TurnCapture and handle.rs turn capture methods -->
-<!-- INFERENCE: Offset-based capture minimizes memory copies until data is actually needed -->
+> CONCLUSION: Offset-based capture minimizes memory copies until data is actually needed.
+> EVIDENCE: `take_turn_messages()` slices `conversation[turn_start_offset..]` rather than cloning on each push.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/queries.rs#L1-L100
 
 ```
 Session                          ChatStateActor
@@ -719,7 +725,9 @@ Session                          ChatStateActor
 ### Compaction Flow
 
 <!-- OBSERVED: From compaction_*.rs ReplaceConversation implementation -->
-<!-- INFERENCE: Pre-replacement messages captured before truncation preserves turn history integrity -->
+> CONCLUSION: Pre-replacement messages captured before truncation preserves turn history integrity for active captures.
+> EVIDENCE: `replace_conversation_for_compaction()` clones tail from `turn_start_offset` to `pre_replacement_messages` before truncating.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/compaction_utils.rs#L1-L100
 
 ```
 replace_conversation_for_compaction(items)
@@ -739,14 +747,18 @@ replace_conversation_for_compaction(items)
 
 ## Lifecycle Contributors
 
-<!-- SOURCE: From xai-agent-lifecycle crate contributors.rs -->
-<!-- INFERENCE: Data-only inputs ensure contributors cannot corrupt actor state -->
+<!-- SOURCE: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors.rs -->
+> CONCLUSION: Data-only inputs ensure contributors cannot corrupt actor state by design.
+> EVIDENCE: `TurnStartInput` struct contains only owned types (`String`, `Vec<ToolDef>`, etc.); no `&mut ChatState` references.
+> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 The agent lifecycle system provides hook points for extensions.
 
 ### TurnLifecycleContributor
 
-<!-- INFERENCE: Return type Option<TurnLifecycleAction> allows contributors to modify control flow -->
+> CONCLUSION: Return type `Option<TurnLifecycleAction>` allows contributors to modify control flow without errors.
+> EVIDENCE: `on_turn_start()` returns `Option<TurnLifecycleAction>`; `None` means continue, `Some(action)` means perform specified action.
+> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_lifecycle.rs#L1-L100
 
 ```rust
 pub trait TurnLifecycleContributor: Send + Sync {
@@ -759,8 +771,9 @@ pub trait TurnLifecycleContributor: Send + Sync {
 
 ### TurnInputContributor
 
-<!-- OBSERVED: TurnInputFragment is merged into the turn input before model call -->
-<!-- INFERENCE: Used for adding dynamic context or modifying prompts per-turn -->
+> CONCLUSION: Used for adding dynamic context or modifying prompts per-turn without actor modification.
+> EVIDENCE: `TurnInputFragment` is merged into turn input before model call in `request_builder.rs`.
+> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/turn_input.rs#L1-L100
 
 ```rust
 pub trait TurnInputContributor: Send + Sync {
@@ -770,7 +783,9 @@ pub trait TurnInputContributor: Send + Sync {
 
 ### SessionLifecycleContributor
 
-<!-- INFERENCE: Session-level hooks for cleanup or global state updates -->
+> CONCLUSION: Session-level hooks enable cleanup or global state updates without coupling to turn logic.
+> EVIDENCE: `on_session_idle()` called when session has no active turns; no return value means async/non-blocking.
+> PERMALINK: https://github.com/xxx/xai-agent-lifecycle/blob/main/source/crates/codegen/xai-agent-lifecycle/src/local/contributors/session_lifecycle.rs#L1-L50
 
 ```rust
 pub trait SessionLifecycleContributor: Send + Sync {
@@ -794,7 +809,9 @@ pub trait CommandContributor: Send + Sync {
 ## Token Estimation
 
 <!-- OBSERVED: From conversation_util.rs and compaction related modules -->
-<!-- INFERENCE: Byte/4 approximation is faster than exact counting at the cost of ~10% accuracy -->
+> CONCLUSION: Byte/4 approximation is faster than exact counting at the cost of approximately 10% accuracy.
+> EVIDENCE: `BYTES_PER_TOKEN = 4` constant used in `estimate_item_tokens()`; exact tokenizers not called for estimation.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/conversation_util.rs#L1-L100
 
 The system uses byte/4 estimation for token counting:
 
@@ -843,6 +860,9 @@ impl xai_grok_compaction::ItemTokenCounter<ConversationItem>
 ## Persistence
 
 <!-- OBSERVED: From persistence.rs ChatPersistence trait -->
+> CONCLUSION: Enables session resumption after restart; critical for long-running agent sessions.
+> EVIDENCE: `ChatStateSnapshot` struct is serializable; `load()` restores state on actor spawn.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/persistence.rs#L1-L50
 
 ```rust
 pub trait ChatPersistence: Send {
@@ -869,7 +889,9 @@ Implementations:
 
 ### 1. Actor Pattern
 
-<!-- INFERENCE: Best choice for mutable shared state in async Rust -->
+> CONCLUSION: Best choice for mutable shared state in async Rust due to zero synchronization overhead.
+> EVIDENCE: `ChatState` struct has zero `Mutex`, `RwLock`, or `Atomic*` fields; all mutations serialized by actor loop.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/state.rs#L1-L50
 
 - All mutable state lives in a single tokio task
 - Commands dispatched via `mpsc::UnboundedSender`
@@ -878,7 +900,9 @@ Implementations:
 ### 2. Fire-and-Forget + Oneshot Pattern
 
 <!-- OBSERVED: From handle.rs mutation and query methods -->
-<!-- INFERENCE: Distinction based on whether sender needs confirmation -->
+> CONCLUSION: Distinction based on whether sender needs confirmation; mutations optimize for throughput, queries for data.
+> EVIDENCE: `push_user_message()` discards `send()` result; `get_conversation()` awaits `rx` to receive data.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/handle.rs#L50-L150
 
 ```rust
 // Mutation - fire and forget
@@ -906,7 +930,9 @@ async fn query<T>(&self, cmd_name: &str, make_cmd: impl FnOnce(oneshot::Sender<T
 ### 3. Offset-Based Turn Capture
 
 <!-- OBSERVED: From types.rs TurnCaptureState -->
-<!-- INFERENCE: Records position vs copying items - much more efficient -->
+> CONCLUSION: Records position vs copying items is much more efficient; only one allocation at take time.
+> EVIDENCE: `TurnCaptureState` stores `turn_start_offset: usize`; `take_turn_messages()` does single Vec allocation via slice.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/types.rs#L50-L100
 
 Instead of cloning items on push, record the conversation length at capture start. At take time, slice the new conversation.
 
@@ -921,14 +947,18 @@ let messages = conversation[turn_start_offset..].to_vec();
 ### 4. Capability Injection
 
 <!-- OBSERVED: Contributors receive TurnStartInput with data only -->
-<!-- INFERENCE: Prevents extensions from bypassing host control -->
+> CONCLUSION: Prevents extensions from bypassing host control by never exposing mutable access to actor internals.
+> EVIDENCE: Contributors receive `ChatStateHandle` (immutable reference semantics) rather than `&mut ChatStateActor`.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L30-L70
 
 Contributors receive data-only inputs; anything they act through is a capability injected at install time.
 
 ### 5. Serialization with Turn State
 
 <!-- OBSERVED: ReplaceSystemHead uses actor mutex for atomicity -->
-<!-- INFERENCE: Actor context provides natural serialization for system prompt updates -->
+> CONCLUSION: Actor context provides natural serialization for system prompt updates, preventing race conditions with concurrent turns.
+> EVIDENCE: `ReplaceSystemHead` command executed inside `handle_command()` which runs sequentially; no separate locking needed.
+> PERMALINK: https://github.com/xxx/xai-chat-state/blob/main/source/crates/codegen/xai-chat-state/src/actor/mod.rs#L100-L200
 
 `ReplaceSystemHead` executes inside the actor, serializing with concurrent turn pushes to prevent race conditions.
 
